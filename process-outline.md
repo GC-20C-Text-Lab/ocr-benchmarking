@@ -23,4 +23,15 @@
 - determine shared and accessible storage for scans
 - create notebook for tesseract workflow
 
+## file naming conventions
+kbaa-p#
+save as tiffs
+
+Amelia: pp 3-33
+Muhammad: pp 34-64
+Shayak: pp 65-95
+Tim: 96-126
+
+
+
 
