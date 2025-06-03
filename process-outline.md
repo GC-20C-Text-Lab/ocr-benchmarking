@@ -27,10 +27,25 @@
 kbaa-p#
 save as tiffs
 
+## page assignments
 Amelia: pp 3-33
 Muhammad: pp 34-64
 Shayak: pp 65-95
 Tim: 96-126
+
+
+## scanning process
+1) Turn on the scanner
+2) Log in to computer
+3) Open Epson software
+4) Choose professional mode
+5) Reflective setting
+6) Document mode
+7) Color -- 24 bit
+8) 300 dpi
+9) Don't worry about setting dimensions
+10) Don't worry about adjustments
+11) Check unsharp mask
 
 
 
