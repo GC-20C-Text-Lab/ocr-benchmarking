@@ -1,5 +1,5 @@
 ## logistics
-- what computer
+- what computer: this doesn't matter if we use API, which should be sufficient for this use case
 
 ## model selection
 - what model(s) -- should we use more than one?
@@ -8,8 +8,15 @@
 ## pricing
 - Anticipate this will be the main barrier. How to estimate?
 - is free an option? 
+- - AV reminds us, Greif et al. says free works
 - do results differ between free and paid?
 
 
 ## mcp 
 - how to connect to ollama
+
+## challenges for this data
+- entries split between columns/pages 
+- - is this remediable via mllm prompt or just hand correction?
+- - does this mean we must do batch processing?
+- track number of times this happens--how big of an issue is this?

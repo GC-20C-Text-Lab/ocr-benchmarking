@@ -74,3 +74,13 @@ Results
 - Gemini 2.0 Flash was the most accurate with no pre-processing, post-processing, or model-specific fine tuning
 - For post-correction, the most accurate method was using Gemini 2.0 Flash on the "noisy transcription" 
 - The LLMs were very succesful in identifying named entities in the "ground truth" documents, and were mostly successful in identifying named entities in the OCR transcripts and the original PNGs
+
+## questions
+
+### for Tesseract
+- do we need to do layout recognition?
+- is there a way to think about an entry by entry approach that doesn't require crazy scanning?
+- would that approach be an improvement?
+
+
+
