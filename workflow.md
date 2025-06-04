@@ -5,10 +5,6 @@
 # Other examples
 ## Greif et al.
 
-
-
-
-
 Corpus size: 30 pages
 Two leading LLMs: Gemini 2.0 Flash and GPT-4o-2024-08-06
 OCR models: Transkibus Text Titan I and Print M1, Tesseract 5.5.0
@@ -20,7 +16,6 @@ Traditional pipline:
     - Grayscaling/increasing contrast
     - Upsampling degraded images
 - layout recognition
-    - inter alia (what is that?)
     - image segmentation
     - line recognition
     - baseline detection
@@ -28,7 +23,6 @@ Traditional pipline:
 - character recognition
     - can fine tune a model to the specific historical font of your corpus
 - post-processing
-    - inter alia
     - manual post-correction
     - rules-based (dictionary) post-correction
     - probabalistic models
