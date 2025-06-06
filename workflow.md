@@ -1,6 +1,7 @@
 # Our proposed workflow
 
-
+## Ground truth guidelines:
+[Ground Truth Guidelines](./ground-truth-guidelines.md)
 
 # Other examples
 ## Greif et al.
