@@ -11,7 +11,7 @@
 From entry 2 in `kbaa-p#003.tif`:
 
 ```
-Aakus, Eivind P., b. 1854. Minne ...Kristiansand: Johansssen & Tangens, 1932. 112 p. MnHi. Minne- sota violinist. [2]
+Aakus, Eivind P., b. 1854. Minne ...Kristiansand: Johanssen & Tangens, 1932. 112 p. MnHi. Minne- sota violinist. [2]
 ```
 
 ## Changelog
