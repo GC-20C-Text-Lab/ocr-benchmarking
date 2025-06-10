@@ -4,6 +4,8 @@ import pytesseract
 
 import os
 
+# This path name is Windows-specific. See if there is a way to include this into the command line's
+# PATH or create a conditional to check if the code is running on Windows.
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
 
 # replace with the name of the folder where the tif files are
