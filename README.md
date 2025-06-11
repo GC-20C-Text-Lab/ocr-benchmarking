@@ -39,6 +39,13 @@ The directory structure is adapted from [Greif et al.](#-credits)
 
 # 🔧 Usage
 
+```bash
+# Perform text accuracy analysis using ground truth and transcribed text files
+python src/benchmarking/txt_accuracy.py
+```
+
+Note: use Anaconda and install all necessary packages before running commands.
+
 ## Input Data Format
 
 The pipeline expects:
