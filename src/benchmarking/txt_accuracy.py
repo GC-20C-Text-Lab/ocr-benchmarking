@@ -33,7 +33,7 @@ import re
 import glob
 import argparse
 import logging
-from rapidfuzz import distance
+from rapidfuzz import distance, fuzz
 import pandas as pd
 from datetime import datetime
 
@@ -136,10 +136,13 @@ def compute_metrics(ref_text, hyp_text, normalized=False, index_numbers=True):
     dist_word = distance.Levenshtein.distance("\n".join(ref_words), "\n".join(hyp_words))
     wer = dist_word / len(ref_words) if len(ref_words) > 0 else 0.0
 
+    token_sort_ratio = fuzz.token_sort_ratio(ref_clean, hyp_clean) if ref_len > 0 else 0.0
+
     return {
         'dist_char': dist_char,
         'cer': cer,
-        'wer': wer
+        'wer': wer,
+        'token_sort_ratio': token_sort_ratio,
     }
 
 
@@ -159,7 +162,7 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
     """
 
     # One column per document
-    metrics = ['dist_char', 'doc_len', 'cer_pct', 'wer_pct']
+    metrics = ['dist_char', 'doc_len', 'cer_pct', 'wer_pct', 'token_sort_ratio']
     df_columns = [f'{doc}:{metric}' for doc in doc_names + ['__ALL__'] for metric in metrics]
 
     # Create dataframe
@@ -176,11 +179,13 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
                 doc_len = doc_lengths.get(doc, 0)
                 cer_pct = cell_data['cer'] * 100
                 wer_pct = cell_data['wer'] * 100
+                token_sort_ratio = cell_data['token_sort_ratio']
 
                 df.at[model, f'{doc}:dist_char'] = dist_char
                 df.at[model, f'{doc}:doc_len'] = doc_len
                 df.at[model, f'{doc}:cer_pct'] = cer_pct
                 df.at[model, f'{doc}:wer_pct'] = wer_pct
+                df.at[model, f'{doc}:token_sort_ratio'] = token_sort_ratio
         
         all_data = results_data[model].get("__ALL__", None)
         if all_data is not None:
@@ -188,11 +193,13 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
             doc_len = total_doc_len
             cer_pct = all_data['cer'] * 100
             wer_pct = all_data['wer'] * 100
+            token_sort_ratio = all_data['token_sort_ratio']
 
             df.at[model, f'__ALL__:dist_char'] = dist_char
             df.at[model, f'__ALL__:doc_len'] = doc_len
             df.at[model, f'__ALL__:cer_pct'] = cer_pct
             df.at[model, f'__ALL__:wer_pct'] = wer_pct
+            df.at[model, f'__ALL__:token_sort_ratio'] = token_sort_ratio
     
     return df
 
