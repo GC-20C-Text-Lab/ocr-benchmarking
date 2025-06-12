@@ -19,25 +19,38 @@ The directory structure is adapted from [Greif et al.](#-credits)
 
 ```
 .
+├── benchmarking-results/ # Benchmarking results
+│   └── txt-accuracy/     # Image-to-text accuracy
 ├── config/                # Configuration files
 │   ├── environment.yml   # Conda environment specification
 │   └── .env              # API keys and credentials
 ├── data/
 │   ├── tiffs/            # Input PDFs (type-1.pdf to type-10.pdf)
-│   ├── ground-truth/
-│   │   └── txt/          # Ground truth text files
+│   ├── ground-truth/     # Ground truth files
+│   │   └── txt/          
 │   └── pngs/             # Intermediate image files as single PNGs
 ├── results/              # Output directory for all models
+│   ├── llm-img2csv/      # CSV files from images using multimodal LLMs
+│   │   └── <MODEL>/      # One folder per model
+│   ├── llm-txt2csv/      # CSV files from transcribed text using multimodal LLMs
+│   │   └── <MODEL>/
+│   ├── llm-img2txt/      # Text transcribed from images using multimodal LLMs
+│   │   └── <MODEL>/
+│   ├── ocr-img2txt/      # Text transcribed from images using OCR software
+│   │   └── <MODEL>/
 ├── src/                  # Source code
 │   ├── benchmarking/     # Benchmarking tools
 │   ├── llm-img2csv/      # Image to CSV converters using multimodal LLMs
 │   ├── llm-txt2csv/      # Text to CSV converters
+│   ├── llm-img2txt/      # Image to text converters using multimodal LLMs
 │   ├── ocr-img2txt/      # OCR processors
 │   └── scripts/          # Utility scripts
 └── logs/                 # Log files
 ```
 
 # 🔧 Usage
+
+Before usage, ensure that the `data` and `results` directories are populated with the correct files.
 
 ```bash
 # Perform text accuracy analysis using ground truth and transcribed text files
