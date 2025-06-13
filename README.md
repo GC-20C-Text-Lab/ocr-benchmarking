@@ -51,13 +51,13 @@ The directory structure is adapted from [Greif et al.](#-credits)
 │   └── pngs/             # Intermediate image files as single PNGs
 ├── results/              # Output directory for all models
 │   ├── llm-img2csv/      # CSV files from images using multimodal LLMs
-│   │   └── <MODEL>/      # One folder per model
+│   │   └── <MODEL_NAME>/ # One folder per model
 │   ├── llm-txt2csv/      # CSV files from transcribed text using multimodal LLMs
-│   │   └── <MODEL>/
+│   │   └── <MODEL_NAME>/
 │   ├── llm-img2txt/      # Text transcribed from images using multimodal LLMs
-│   │   └── <MODEL>/
+│   │   └── <MODEL_NAME>/
 │   ├── ocr-img2txt/      # Text transcribed from images using OCR software
-│   │   └── <MODEL>/
+│   │   └── <MODEL_NAME>/
 ├── src/                  # Source code
 │   ├── benchmarking/     # Benchmarking tools
 │   ├── llm-img2csv/      # Image to CSV converters using multimodal LLMs
@@ -66,6 +66,30 @@ The directory structure is adapted from [Greif et al.](#-credits)
 │   ├── ocr-img2txt/      # OCR processors
 │   └── scripts/          # Utility scripts
 └── logs/                 # Log files
+```
+
+## File naming scheme
+
+- `XYZ` refers to a three-digit page number (with padded zeroes as necessary).
+- `{A,B}` refers to either A or B.
+- `<NAME>` means to replace with the correct name.
+
+The base file naming scheme is `kbaa-pXYZ`, followed by the file extension.
+This is preceded by prefixes as described below:
+
+### data
+
+```
+data/ground-truth/{txt,json}/gt_kbaa-pXYZ.{txt,json}
+data/{pngs,tiffs}/kbaa-pXYZ.{png,tif}
+```
+
+### results
+
+```
+results/{llm,ocr}{img,txt}2{txt,json}/
+  <MODEL_NAME>/<MODEL_NAME>_{txt,img}_kbaa-pXYZ.{txt,json}
+                            ^ input format      ^ output format
 ```
 
 # 🔧 Usage
