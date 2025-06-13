@@ -1,0 +1,2 @@
+,kbaa-p#100:dist_char,kbaa-p#100:doc_len,kbaa-p#100:cer_pct,kbaa-p#100:wer_pct,__ALL__:dist_char,__ALL__:doc_len,__ALL__:cer_pct,__ALL__:wer_pct
+pytesseract,351,3855,9.105058365758754,57.25938009787929,351,3855,9.105058365758754,57.25938009787929

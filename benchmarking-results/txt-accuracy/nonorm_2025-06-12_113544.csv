@@ -1,0 +1,2 @@
+,kbaa-p#101:dist_char,kbaa-p#101:doc_len,kbaa-p#101:cer_pct,kbaa-p#101:wer_pct,kbaa-p#101:token_sort_ratio,kbaa-p#100:dist_char,kbaa-p#100:doc_len,kbaa-p#100:cer_pct,kbaa-p#100:wer_pct,kbaa-p#100:token_sort_ratio,__ALL__:dist_char,__ALL__:doc_len,__ALL__:cer_pct,__ALL__:wer_pct,__ALL__:token_sort_ratio
+pytesseract,347,3787,9.162925798785318,57.73710482529118,95.82180044813497,350,3854,9.08147379346134,57.09624796084829,96.26749611197512,697,7642,9.120649044752682,57.41350906095551,95.94250245017967
