@@ -371,7 +371,7 @@ def main():
     # Put metrics in table
     # ====================
 
-    time = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+    time = datetime.now().strftime('%Y-%m-%d_%H%M%S')
 
     normalized_df = build_dataframe(f"normalized_{time}",
                                     doc_names,
