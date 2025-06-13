@@ -4,6 +4,26 @@ Testing methods for digitizing print bibliography as structured data
 
 # 🚀 Installation
 
+## Prerequisites
+
+- Anaconda or Miniconda
+
+## Install packages:
+
+Use Anaconda and install all necessary packages before running commands.
+
+```bash
+# Create and activate Conda environment
+conda env create --file=config/environment.yaml
+conda activate ocr-benchmarking
+
+# To install additional packages, add them to config/environment.yaml.
+# Then, enter:
+conda env update --file config/environment.yaml
+```
+
+## Set up API keys
+
 Set up your API keys in `config/.env`:
 
 ```
@@ -56,8 +76,6 @@ Before usage, ensure that the `data` and `results` directories are populated wit
 # Perform text accuracy analysis using ground truth and transcribed text files
 python src/benchmarking/txt_accuracy.py
 ```
-
-Note: use Anaconda and install all necessary packages before running commands.
 
 ## Input Data Format
 
