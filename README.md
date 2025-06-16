@@ -13,11 +13,13 @@ Testing methods for digitizing print bibliography as structured data
 Use Anaconda and install all necessary packages before running commands.
 
 ```bash
-# Create and activate Conda environment
+# Create Conda environment
 conda env create --file=config/environment.yaml
+
+# On each new terminal window, activate Conda environment
 conda activate ocr-benchmarking
 
-# To install additional packages, add them to config/environment.yaml.
+# To install additional packages, add them to config/environment.yaml
 # Then, enter:
 conda env update --file config/environment.yaml
 ```
@@ -103,10 +105,8 @@ python src/benchmarking/txt_accuracy.py
 
 ## Input Data Format
 
-The pipeline expects:
-- TIFF files in `/tiffs`. Named `kbaa-p#ABC.tif`, where `ABC` is the three-digit page number (with leading zeros if necessary)
-- Ground truth text files in `data/ground-truth/txt`. Named `kbaa-p#ABC.txt`
-  - See formatting guidelines for ground truth text files in the [Ground Truth Guidelines](./ground-truth-guidelines.md)
+- The pipeline expects files to be located and named in accordance with the above [directory structure](#-directory-structure).
+- See formatting guidelines for ground truth text files in the [Ground Truth Guidelines](./ground-truth-guidelines.md)
 
 # 📊 Benchmarking
 
