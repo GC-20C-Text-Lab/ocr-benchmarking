@@ -1,7 +1,7 @@
 """
 Benchmarking OCR vs. LLM for text extraction, parallelized with joblib + rapidfuzz.
 
-Generates TWO Pandas dataframes in TWO files:
+Generates TWO Pandas dataframes in TWO .csv files:
 
 1) Normalized Results
    - Non-ASCII removed entirely
@@ -17,11 +17,13 @@ Generates TWO Pandas dataframes in TWO files:
    - Collapse multiple spaces
    - Strip leading/trailing
 
-Each type of results has 4 columns for each document and for all documents:
+Each type of results has 4 rows for each document and for all documents:
    1) Levenshtein distance ({doc}:dist_char)
    2) ground-truth doc length (for that table's version) ({doc}:gt_length)
    3) CER% (distance / length_of_that_version) ({doc}:cer_pct)
    4) WER% ({doc}:wer_pct)
+
+Each model is on a separate column.
 
 Original authors: Niclas Griesshaber, Gavin Greif, Robin Greif
 New authors: Tim Yu
@@ -153,21 +155,21 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
     - doc_lengths[doc] => length of that doc in the relevant cleaning
     - total_doc_len => sum of all doc lengths in that cleaning
 
-    The dataframe has one column for each document and metric, for example:
+    The dataframe has one row for each document and metric, for example:
     - doc1:dist_char, doc1:doc_len, doc1:cer_pct, doc1:wer_pct, doc2:dist_char, ..., __ALL__:dist_char, ...
 
-    The dataframe has one row for each model used, like pytesseract.
+    The dataframe has one column for each model used, like pytesseract.
 
     Returns the dataframe for the results data.
     """
 
     # One column per document
     metrics = ['dist_char', 'doc_len', 'cer_pct', 'wer_pct', 'token_sort_ratio']
-    df_columns = [f'{doc}:{metric}' for doc in doc_names + ['__ALL__'] for metric in metrics]
+    # df_columns = [f'{doc}:{metric}' for doc in doc_names + ['__ALL__'] for metric in metrics]
 
     # Create dataframe
     df = pd.DataFrame(
-        columns=df_columns
+        columns=results_data.keys()
     )
 
     # Populate dataframe
@@ -181,11 +183,11 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
                 wer_pct = cell_data['wer'] * 100
                 token_sort_ratio = cell_data['token_sort_ratio']
 
-                df.at[model, f'{doc}:dist_char'] = dist_char
-                df.at[model, f'{doc}:doc_len'] = doc_len
-                df.at[model, f'{doc}:cer_pct'] = cer_pct
-                df.at[model, f'{doc}:wer_pct'] = wer_pct
-                df.at[model, f'{doc}:token_sort_ratio'] = token_sort_ratio
+                df.at[f'{doc}:dist_char', model] = dist_char
+                df.at[f'{doc}:doc_len', model] = doc_len
+                df.at[f'{doc}:cer_pct', model] = cer_pct
+                df.at[f'{doc}:wer_pct', model] = wer_pct
+                df.at[f'{doc}:token_sort_ratio', model] = token_sort_ratio
         
         all_data = results_data[model].get("__ALL__", None)
         if all_data is not None:
@@ -195,11 +197,11 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
             wer_pct = all_data['wer'] * 100
             token_sort_ratio = all_data['token_sort_ratio']
 
-            df.at[model, f'__ALL__:dist_char'] = dist_char
-            df.at[model, f'__ALL__:doc_len'] = doc_len
-            df.at[model, f'__ALL__:cer_pct'] = cer_pct
-            df.at[model, f'__ALL__:wer_pct'] = wer_pct
-            df.at[model, f'__ALL__:token_sort_ratio'] = token_sort_ratio
+            df.at[f'__ALL__:dist_char', model] = dist_char
+            df.at[f'__ALL__:doc_len', model] = doc_len
+            df.at[f'__ALL__:cer_pct', model] = cer_pct
+            df.at[f'__ALL__:wer_pct', model] = wer_pct
+            df.at[f'__ALL__:token_sort_ratio', model] = token_sort_ratio
     
     return df
 
