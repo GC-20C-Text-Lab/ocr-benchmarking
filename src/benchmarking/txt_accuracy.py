@@ -1,7 +1,7 @@
 """
 Benchmarking OCR vs. LLM for text extraction, parallelized with joblib + rapidfuzz.
 
-Generates TWO Pandas dataframes in TWO files:
+Generates TWO Pandas dataframes in TWO .csv files:
 
 1) Normalized Results
    - Non-ASCII removed entirely
@@ -17,11 +17,13 @@ Generates TWO Pandas dataframes in TWO files:
    - Collapse multiple spaces
    - Strip leading/trailing
 
-Each type of results has 4 columns for each document and for all documents:
+Each type of results has 4 rows for each document and for all documents:
    1) Levenshtein distance ({doc}:dist_char)
    2) ground-truth doc length (for that table's version) ({doc}:gt_length)
    3) CER% (distance / length_of_that_version) ({doc}:cer_pct)
    4) WER% ({doc}:wer_pct)
+
+Each model is on a separate column.
 
 Original authors: Niclas Griesshaber, Gavin Greif, Robin Greif
 New authors: Tim Yu
@@ -153,21 +155,21 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
     - doc_lengths[doc] => length of that doc in the relevant cleaning
     - total_doc_len => sum of all doc lengths in that cleaning
 
-    The dataframe has one column for each document and metric, for example:
+    The dataframe has one row for each document and metric, for example:
     - doc1:dist_char, doc1:doc_len, doc1:cer_pct, doc1:wer_pct, doc2:dist_char, ..., __ALL__:dist_char, ...
 
-    The dataframe has one row for each model used, like pytesseract.
+    The dataframe has one column for each model used, like pytesseract.
 
     Returns the dataframe for the results data.
     """
 
     # One column per document
     metrics = ['dist_char', 'doc_len', 'cer_pct', 'wer_pct', 'token_sort_ratio']
-    df_columns = [f'{doc}:{metric}' for doc in doc_names + ['__ALL__'] for metric in metrics]
+    # df_columns = [f'{doc}:{metric}' for doc in doc_names + ['__ALL__'] for metric in metrics]
 
     # Create dataframe
     df = pd.DataFrame(
-        columns=df_columns
+        columns=results_data.keys()
     )
 
     # Populate dataframe
@@ -181,11 +183,11 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
                 wer_pct = cell_data['wer'] * 100
                 token_sort_ratio = cell_data['token_sort_ratio']
 
-                df.at[model, f'{doc}:dist_char'] = dist_char
-                df.at[model, f'{doc}:doc_len'] = doc_len
-                df.at[model, f'{doc}:cer_pct'] = cer_pct
-                df.at[model, f'{doc}:wer_pct'] = wer_pct
-                df.at[model, f'{doc}:token_sort_ratio'] = token_sort_ratio
+                df.at[f'{doc}:dist_char', model] = dist_char
+                df.at[f'{doc}:doc_len', model] = doc_len
+                df.at[f'{doc}:cer_pct', model] = cer_pct
+                df.at[f'{doc}:wer_pct', model] = wer_pct
+                df.at[f'{doc}:token_sort_ratio', model] = token_sort_ratio
         
         all_data = results_data[model].get("__ALL__", None)
         if all_data is not None:
@@ -195,18 +197,22 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
             wer_pct = all_data['wer'] * 100
             token_sort_ratio = all_data['token_sort_ratio']
 
-            df.at[model, f'__ALL__:dist_char'] = dist_char
-            df.at[model, f'__ALL__:doc_len'] = doc_len
-            df.at[model, f'__ALL__:cer_pct'] = cer_pct
-            df.at[model, f'__ALL__:wer_pct'] = wer_pct
-            df.at[model, f'__ALL__:token_sort_ratio'] = token_sort_ratio
+            df.at[f'__ALL__:dist_char', model] = dist_char
+            df.at[f'__ALL__:doc_len', model] = doc_len
+            df.at[f'__ALL__:cer_pct', model] = cer_pct
+            df.at[f'__ALL__:wer_pct', model] = wer_pct
+            df.at[f'__ALL__:token_sort_ratio', model] = token_sort_ratio
     
     return df
 
 
-def get_doc_names(dir):
+def get_doc_names(dir, prefix=True, prefix_delimiter='_'):
     """
     Return a list of txt document names from `dir` without the .txt extensions.
+
+    If prefix is True, return original document names.
+    Otherwise, strip prefix names (everything before the final prefix delimiter).
+    - For example: gt_kbaa-123.txt -> kbaa-123.txt (prefix_delimiter='_')
     """
 
     gt_paths = glob.glob(os.path.join(dir, "*.txt"))
@@ -214,6 +220,11 @@ def get_doc_names(dir):
 
     doc_names = [os.path.splitext(os.path.basename(p))[0] for p in gt_paths]
     logger.info("Found file names: %s", doc_names)
+
+    # Strip prefix names if requested
+    if not prefix:
+        doc_names = list(map(lambda name: str.split(name, prefix_delimiter)[-1], doc_names))
+
     return doc_names
 
 
@@ -256,12 +267,14 @@ def get_all_models(llm_root, ocr_root):
     return all_models
 
 
-def get_docs(dir, doc_names):
+def get_docs(dir, doc_names, prefix=False):
     """
     Returns a 2-tuple containing
     - a dict with
         - `doc_names` as the keys
-        - the contents of `dir/{key}.txt` for each key as the values.
+        - The contents of `dir/{doc}` as the corresponding values
+          (assuming `doc` is a key of `doc_name`).
+            - If prefix is True, `doc` may be preceded by any prefix.
     - a string containing the content of all the values in the dict
         - in the order given by doc_names
         - each value is separated by a newline
@@ -273,7 +286,10 @@ def get_docs(dir, doc_names):
     all_docs = ''
 
     for doc in doc_names:
-        path = os.path.join(dir, f"{doc}.txt")
+        doc_pattern = f'*{doc}.txt' if prefix else f'{doc}.txt'
+        paths = glob.glob(os.path.join(dir, doc_pattern))
+        path = paths[0] # find first path; assume that one page exists once in each folder
+
         with open(path, "r", encoding="utf-8") as f:
             txt = f.read()
         docs[doc] = txt
@@ -285,10 +301,10 @@ def get_docs(dir, doc_names):
 def main():
     """
     Prerequisites:
-    - Ground truth text files located at `project_root/ground-truth/txt/kbaa-p#xyz.txt`
+    - Ground truth text files located at `project_root/ground-truth/txt/gt_kbaa-pXYZ.txt`
     - LLM/OCR transcribed files located at:
-        - for LLM transcriptions: `project_root/results/llm_img2txt/<MODEL-NAME>/kbaa-p#xyz.txt`
-        - for OCR transcriptions: `project_root/results/ocr_img2txt/<MODEL-NAME>/kbaa-p#xyz.txt`
+        - for LLM transcriptions: `project_root/results/llm_img2txt/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.txt`
+        - for OCR transcriptions: `project_root/results/ocr_img2txt/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.txt`
 
     The main function will:
     - Gather all ground truth text files
@@ -312,7 +328,7 @@ def main():
 
     # Ground truth
     ground_truth_dir = os.path.join(project_root, "data", "ground-truth", "txt")
-    doc_names = get_doc_names(ground_truth_dir)
+    doc_names = get_doc_names(ground_truth_dir, prefix=False)
 
     # results/ paths
     all_models = get_all_models(
@@ -327,7 +343,7 @@ def main():
 
     # -> Gather ground truths and put into dict:
 
-    ground_truths, ground_truths['__ALL__'] = get_docs(ground_truth_dir, doc_names)
+    ground_truths, ground_truths['__ALL__'] = get_docs(ground_truth_dir, doc_names, prefix=True)
     doc_lengths_normalized = {doc: len(clean_text_normalized(text)) for doc, text in ground_truths.items()}
     doc_lengths_nonorm = {doc: len(clean_text_nonorm(text)) for doc, text in ground_truths.items()}
     total_doc_len_normalized = len(clean_text_normalized(ground_truths['__ALL__']))
@@ -341,7 +357,7 @@ def main():
     for model_type, model in all_models:
         logger.info("Collecting results for model: %s", model)
         model_path = os.path.join(project_root, "results", model_type, model)
-        results[model], results[model]['__ALL__'] = get_docs(model_path, doc_names)
+        results[model], results[model]['__ALL__'] = get_docs(model_path, doc_names, prefix=True)
         logger.info("Collected results for model: %s", list(results[model].keys()))
 
     
