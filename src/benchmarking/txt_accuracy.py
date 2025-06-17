@@ -43,8 +43,8 @@ import sys
 script_dir = os.path.dirname(os.path.realpath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
 
-sys.path.insert(1, os.path.join(project_root, "src", "tools"))
-from file_retrieval import get_doc_names, get_all_models, get_docs
+sys.path.insert(1, os.path.join(project_root, "src"))
+from tools.file_retrieval import get_doc_names, get_all_models, get_docs
 
 
 # ----------------- Configure Logging -----------------
@@ -241,7 +241,7 @@ def main():
 
     # Ground truth
     ground_truth_dir = os.path.join(project_root, "data", "ground-truth", "txt")
-    doc_names = get_doc_names(ground_truth_dir, prefix=False)
+    doc_names = get_doc_names(ground_truth_dir, keep_prefix=False)
 
     # results/ paths
     all_models = get_all_models(
@@ -256,7 +256,7 @@ def main():
 
     # -> Gather ground truths and put into dict:
 
-    ground_truths, ground_truths['__ALL__'] = get_docs(ground_truth_dir, doc_names, prefix=True)
+    ground_truths, ground_truths['__ALL__'] = get_docs(ground_truth_dir, doc_names, name_has_prefix=True)
     doc_lengths_normalized = {doc: len(clean_text_normalized(text)) for doc, text in ground_truths.items()}
     doc_lengths_nonorm = {doc: len(clean_text_nonorm(text)) for doc, text in ground_truths.items()}
     total_doc_len_normalized = len(clean_text_normalized(ground_truths['__ALL__']))
@@ -270,7 +270,7 @@ def main():
     for model_type, model in all_models:
         logger.info("Collecting results for model: %s", model)
         model_path = os.path.join(project_root, "results", model_type, model)
-        results[model], results[model]['__ALL__'] = get_docs(model_path, doc_names, prefix=True)
+        results[model], results[model]['__ALL__'] = get_docs(model_path, doc_names, name_has_prefix=True)
         logger.info("Collected results for model: %s", list(results[model].keys()))
 
     
