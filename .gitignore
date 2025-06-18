@@ -1,5 +1,8 @@
 *.env
+env/
+images/
+output/
 data/*
 .DS_Store
 __pycache__/
-results/*
+*ground-truth/
