@@ -24,9 +24,8 @@ Each type of results has 4 columns for each document and for all documents:
    4) WER% ({doc}:wer_pct)
 
 Original authors: Niclas Griesshaber, Gavin Greif, Robin Greif
-New authors: Tim Yu
+New authors: Tim Yu, Muhammad Khalid
 """
-
 
 import os
 import re
@@ -42,7 +41,7 @@ from datetime import datetime
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
 
@@ -67,7 +66,7 @@ def clean_text_nonorm(text, index_numbers=True):
     text = re.sub(r" *\[ *[0-9]+ *\] *", " ", text) if not index_numbers else text
 
     # Replace various forms of whitespace with space
-    text = text.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+    text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
 
     # Replace multiple spaces with single space
     text = re.sub(r"\s+", " ", text)
@@ -133,14 +132,12 @@ def compute_metrics(ref_text, hyp_text, normalized=False, index_numbers=True):
     # For WER, split by whitespace
     ref_words = ref_clean.split()
     hyp_words = hyp_clean.split()
-    dist_word = distance.Levenshtein.distance("\n".join(ref_words), "\n".join(hyp_words))
+    dist_word = distance.Levenshtein.distance(
+        "\n".join(ref_words), "\n".join(hyp_words)
+    )
     wer = dist_word / len(ref_words) if len(ref_words) > 0 else 0.0
 
-    return {
-        'dist_char': dist_char,
-        'cer': cer,
-        'wer': wer
-    }
+    return {"dist_char": dist_char, "cer": cer, "wer": wer}
 
 
 def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
@@ -159,41 +156,41 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
     """
 
     # One column per document
-    metrics = ['dist_char', 'doc_len', 'cer_pct', 'wer_pct']
-    df_columns = [f'{doc}:{metric}' for doc in doc_names + ['__ALL__'] for metric in metrics]
+    metrics = ["dist_char", "doc_len", "cer_pct", "wer_pct"]
+    df_columns = [
+        f"{doc}:{metric}" for doc in doc_names + ["__ALL__"] for metric in metrics
+    ]
 
     # Create dataframe
-    df = pd.DataFrame(
-        columns=df_columns
-    )
+    df = pd.DataFrame(columns=df_columns)
 
     # Populate dataframe
     for model in results_data.keys():
         for doc in doc_names:
             cell_data = results_data[model].get(doc, None)
             if cell_data is not None:
-                dist_char = cell_data['dist_char']
+                dist_char = cell_data["dist_char"]
                 doc_len = doc_lengths.get(doc, 0)
-                cer_pct = cell_data['cer'] * 100
-                wer_pct = cell_data['wer'] * 100
+                cer_pct = cell_data["cer"] * 100
+                wer_pct = cell_data["wer"] * 100
 
-                df.at[model, f'{doc}:dist_char'] = dist_char
-                df.at[model, f'{doc}:doc_len'] = doc_len
-                df.at[model, f'{doc}:cer_pct'] = cer_pct
-                df.at[model, f'{doc}:wer_pct'] = wer_pct
-        
+                df.at[model, f"{doc}:dist_char"] = dist_char
+                df.at[model, f"{doc}:doc_len"] = doc_len
+                df.at[model, f"{doc}:cer_pct"] = cer_pct
+                df.at[model, f"{doc}:wer_pct"] = wer_pct
+
         all_data = results_data[model].get("__ALL__", None)
         if all_data is not None:
-            dist_char = all_data['dist_char']
+            dist_char = all_data["dist_char"]
             doc_len = total_doc_len
-            cer_pct = all_data['cer'] * 100
-            wer_pct = all_data['wer'] * 100
+            cer_pct = all_data["cer"] * 100
+            wer_pct = all_data["wer"] * 100
 
-            df.at[model, f'__ALL__:dist_char'] = dist_char
-            df.at[model, f'__ALL__:doc_len'] = doc_len
-            df.at[model, f'__ALL__:cer_pct'] = cer_pct
-            df.at[model, f'__ALL__:wer_pct'] = wer_pct
-    
+            df.at[model, f"__ALL__:dist_char"] = dist_char
+            df.at[model, f"__ALL__:doc_len"] = doc_len
+            df.at[model, f"__ALL__:cer_pct"] = cer_pct
+            df.at[model, f"__ALL__:wer_pct"] = wer_pct
+
     return df
 
 
@@ -210,10 +207,11 @@ def get_doc_names(dir):
     return doc_names
 
 
-def get_all_models(llm_root, ocr_root):
+def get_all_models(llm_root, ocr_root, ocr_llm_root):
     """
     llm_root is the directory where LLM model folders are located.
     ocr_root is the directory where OCR model folders are located.
+    ocr_llm_root is the directory where OCR-LLM model folders are located.
 
     Example file structure:
     - llm_root
@@ -237,12 +235,28 @@ def get_all_models(llm_root, ocr_root):
 
     llm_models = []
     if os.path.isdir(llm_root):
-        llm_models = [m for m in os.listdir(llm_root) if os.path.isdir(os.path.join(llm_root, m))]
+        llm_models = [
+            m for m in os.listdir(llm_root) if os.path.isdir(os.path.join(llm_root, m))
+        ]
     ocr_models = []
     if os.path.isdir(ocr_root):
-        ocr_models = [m for m in os.listdir(ocr_root) if os.path.isdir(os.path.join(ocr_root, m))]
+        ocr_models = [
+            m for m in os.listdir(ocr_root) if os.path.isdir(os.path.join(ocr_root, m))
+        ]
 
-    all_models = [("llm_img2txt", m) for m in llm_models] + [("ocr_img2txt", m) for m in ocr_models]
+    ocr_llm_models = []
+    if os.path.isdir(ocr_llm_root):
+        ocr_llm_models = [
+            m
+            for m in os.listdir(ocr_llm_root)
+            if os.path.isdir(os.path.join(ocr_llm_root, m))
+        ]
+
+    all_models = (
+        [("llm_img2txt", m) for m in llm_models]
+        + [("ocr_img2txt", m) for m in ocr_models]
+        + [("ocr_llm_img2txt", m) for m in ocr_llm_models]
+    )
     # sort by model name
     all_models.sort(key=lambda x: x[1].lower())
 
@@ -263,14 +277,14 @@ def get_docs(dir, doc_names):
     """
 
     docs = {}
-    all_docs = ''
+    all_docs = ""
 
     for doc in doc_names:
         path = os.path.join(dir, f"{doc}.txt")
         with open(path, "r", encoding="utf-8") as f:
             txt = f.read()
         docs[doc] = txt
-        all_docs += txt + '\n'
+        all_docs += txt + "\n"
 
     return docs, all_docs
 
@@ -310,9 +324,10 @@ def main():
     # results/ paths
     all_models = get_all_models(
         os.path.join(project_root, "results", "llm_img2txt"),
-        os.path.join(project_root, "results", "ocr_img2txt")
+        os.path.join(project_root, "results", "ocr_img2txt"),
+        os.path.join(project_root, "results", "ocr_llm_img2txt"),
     )
-    logger.info(f'Models found: {all_models}')
+    logger.info(f"Models found: {all_models}")
 
     # ===========
     # Gather files
@@ -320,11 +335,15 @@ def main():
 
     # -> Gather ground truths and put into dict:
 
-    ground_truths, ground_truths['__ALL__'] = get_docs(ground_truth_dir, doc_names)
-    doc_lengths_normalized = {doc: len(clean_text_normalized(text)) for doc, text in ground_truths.items()}
-    doc_lengths_nonorm = {doc: len(clean_text_nonorm(text)) for doc, text in ground_truths.items()}
-    total_doc_len_normalized = len(clean_text_normalized(ground_truths['__ALL__']))
-    total_doc_len_nonorm = len(clean_text_nonorm(ground_truths['__ALL__']))
+    ground_truths, ground_truths["__ALL__"] = get_docs(ground_truth_dir, doc_names)
+    doc_lengths_normalized = {
+        doc: len(clean_text_normalized(text)) for doc, text in ground_truths.items()
+    }
+    doc_lengths_nonorm = {
+        doc: len(clean_text_nonorm(text)) for doc, text in ground_truths.items()
+    }
+    total_doc_len_normalized = len(clean_text_normalized(ground_truths["__ALL__"]))
+    total_doc_len_nonorm = len(clean_text_nonorm(ground_truths["__ALL__"]))
 
     # -> Gather each transcribed document and put into dict:
 
@@ -334,10 +353,9 @@ def main():
     for model_type, model in all_models:
         logger.info("Collecting results for model: %s", model)
         model_path = os.path.join(project_root, "results", model_type, model)
-        results[model], results[model]['__ALL__'] = get_docs(model_path, doc_names)
+        results[model], results[model]["__ALL__"] = get_docs(model_path, doc_names)
         logger.info("Collected results for model: %s", list(results[model].keys()))
 
-    
     # ===============
     # Compute metrics
     # ===============
@@ -352,11 +370,19 @@ def main():
         logger.info("Computing metrics for model: %s", model)
         for doc in doc_names:
             logger.info("Computing metrics for document: %s", doc)
-            normalized_results_data[model][doc] = compute_metrics(ground_truths[doc], results[model][doc], normalized=True)
-            nonorm_results_data[model][doc] = compute_metrics(ground_truths[doc], results[model][doc], normalized=False)
-        
-        normalized_results_data[model]['__ALL__'] = compute_metrics(ground_truths['__ALL__'], results[model]['__ALL__'], normalized=True)
-        nonorm_results_data[model]['__ALL__'] = compute_metrics(ground_truths['__ALL__'], results[model]['__ALL__'], normalized=False)
+            normalized_results_data[model][doc] = compute_metrics(
+                ground_truths[doc], results[model][doc], normalized=True
+            )
+            nonorm_results_data[model][doc] = compute_metrics(
+                ground_truths[doc], results[model][doc], normalized=False
+            )
+
+        normalized_results_data[model]["__ALL__"] = compute_metrics(
+            ground_truths["__ALL__"], results[model]["__ALL__"], normalized=True
+        )
+        nonorm_results_data[model]["__ALL__"] = compute_metrics(
+            ground_truths["__ALL__"], results[model]["__ALL__"], normalized=False
+        )
 
     # Compute metrics separately for __ALL__]
 
@@ -364,29 +390,33 @@ def main():
     # Put metrics in table
     # ====================
 
-    time = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+    time = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 
-    normalized_df = build_dataframe(f"normalized_{time}",
-                                    doc_names,
-                                    normalized_results_data,
-                                    doc_lengths_normalized,
-                                    total_doc_len_normalized)
-    nonorm_df = build_dataframe(f"nonorm_{time}",
-                                    doc_names,
-                                    nonorm_results_data,
-                                    doc_lengths_nonorm,
-                                    total_doc_len_nonorm)
-    
+    normalized_df = build_dataframe(
+        f"normalized_{time}",
+        doc_names,
+        normalized_results_data,
+        doc_lengths_normalized,
+        total_doc_len_normalized,
+    )
+    nonorm_df = build_dataframe(
+        f"nonorm_{time}",
+        doc_names,
+        nonorm_results_data,
+        doc_lengths_nonorm,
+        total_doc_len_nonorm,
+    )
+
     # ============
     # Save results
     # ============
 
     # Default save to project_root/benchmarking-results/txt-accuracy
-    results_path = os.path.join(project_root, 'benchmarking-results', 'txt-accuracy')
+    results_path = os.path.join(project_root, "benchmarking-results", "txt-accuracy")
     if not os.path.exists(results_path):
         os.makedirs(results_path)
-    normalized_df.to_csv(os.path.join(results_path, f'normalized_{time}.csv'))
-    nonorm_df.to_csv(os.path.join(results_path, f'nonorm_{time}.csv'))
+    normalized_df.to_csv(os.path.join(results_path, f"normalized_{time}.csv"))
+    nonorm_df.to_csv(os.path.join(results_path, f"nonorm_{time}.csv"))
 
 
 if __name__ == "__main__":
