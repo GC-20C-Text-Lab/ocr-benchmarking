@@ -143,13 +143,14 @@ def compute_metrics(ref_text, hyp_text, normalized=False, index_numbers=True):
     cer = dist_char / ref_len if ref_len > 0 else 0.0
 
     # For WER, split by whitespace and full stops
-    ref_words = re.sub(r"\.", " ", ref_clean).split()
-    hyp_words = re.sub(r"\.", " ", hyp_clean).split()
+    ref_delimited = re.sub(r"\.", " ", ref_clean)
+    hyp_delimited = re.sub(r"\.", " ", hyp_clean)
+    ref_words = ref_delimited.split()
+    hyp_words = hyp_delimited.split()
     dist_word = distance.Levenshtein.distance("\n".join(ref_words), "\n".join(hyp_words))
     wer = dist_word / len(ref_words) if len(ref_words) > 0 else 0.0
 
-    # NOTE: Token sort ratio does NOT replace full stops with whitespace.
-    token_sort_ratio = fuzz.token_sort_ratio(ref_clean, hyp_clean) if ref_len > 0 else 0.0
+    token_sort_ratio = fuzz.token_sort_ratio(ref_delimited, hyp_delimited) if ref_len > 0 else 0.0
 
     return {
         'dist_char': dist_char,
