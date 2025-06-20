@@ -111,6 +111,9 @@ def clean_text_normalized(text, index_numbers=True):
     # Lowercase
     text = text.lower()
 
+    # Replace periods with a space before removing other punctuation
+    text = re.sub(r".", " ", text)
+
     # Keep only [a-z0-9] + space
     text = re.sub(r"[^a-z0-9 ]+", "", text)
 
@@ -139,9 +142,9 @@ def compute_metrics(ref_text, hyp_text, normalized=False, index_numbers=True):
 
     cer = dist_char / ref_len if ref_len > 0 else 0.0
 
-    # For WER, split by whitespace
-    ref_words = ref_clean.split()
-    hyp_words = hyp_clean.split()
+    # For WER, split by whitespace and full stops
+    ref_words = re.sub(r".", " ", ref_clean).split()
+    hyp_words = re.sub(r".", " ", hyp_clean).split()
     dist_word = distance.Levenshtein.distance("\n".join(ref_words), "\n".join(hyp_words))
     wer = dist_word / len(ref_words) if len(ref_words) > 0 else 0.0
 
