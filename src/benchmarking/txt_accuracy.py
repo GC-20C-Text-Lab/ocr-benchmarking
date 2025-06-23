@@ -1,7 +1,7 @@
 """
 Benchmarking OCR vs. LLM for text extraction, parallelized with joblib + rapidfuzz.
 
-Generates TWO Pandas dataframes in TWO files:
+Generates TWO Pandas dataframes in TWO .csv files:
 
 1) Normalized Results
    - Non-ASCII removed entirely
@@ -17,24 +17,34 @@ Generates TWO Pandas dataframes in TWO files:
    - Collapse multiple spaces
    - Strip leading/trailing
 
-Each type of results has 4 columns for each document and for all documents:
+Each type of results has 4 rows for each document and for all documents:
    1) Levenshtein distance ({doc}:dist_char)
    2) ground-truth doc length (for that table's version) ({doc}:gt_length)
    3) CER% (distance / length_of_that_version) ({doc}:cer_pct)
    4) WER% ({doc}:wer_pct)
 
+Each model is on a separate column.
+
 Original authors: Niclas Griesshaber, Gavin Greif, Robin Greif
 New authors: Tim Yu, Muhammad Khalid
 """
 
+# ----------------- Imports -----------------
 import os
 import re
 import glob
 import argparse
 import logging
-from rapidfuzz import distance
+from rapidfuzz import distance, fuzz
 import pandas as pd
 from datetime import datetime
+import sys
+
+script_dir = os.path.dirname(os.path.realpath(__file__))
+project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
+
+sys.path.insert(1, os.path.join(project_root, "src"))
+from tools.file_retrieval import get_doc_names, get_all_models, get_docs
 
 
 # ----------------- Configure Logging -----------------
@@ -101,6 +111,9 @@ def clean_text_normalized(text, index_numbers=True):
     # Lowercase
     text = text.lower()
 
+    # Replace periods with a space before removing other punctuation
+    text = re.sub(r"\.", " ", text)
+
     # Keep only [a-z0-9] + space
     text = re.sub(r"[^a-z0-9 ]+", "", text)
 
@@ -129,15 +142,26 @@ def compute_metrics(ref_text, hyp_text, normalized=False, index_numbers=True):
 
     cer = dist_char / ref_len if ref_len > 0 else 0.0
 
-    # For WER, split by whitespace
-    ref_words = ref_clean.split()
-    hyp_words = hyp_clean.split()
+    # For WER, split by whitespace and full stops
+    ref_delimited = re.sub(r"\.", " ", ref_clean)
+    hyp_delimited = re.sub(r"\.", " ", hyp_clean)
+    ref_words = ref_delimited.split()
+    hyp_words = hyp_delimited.split()
     dist_word = distance.Levenshtein.distance(
         "\n".join(ref_words), "\n".join(hyp_words)
     )
     wer = dist_word / len(ref_words) if len(ref_words) > 0 else 0.0
 
-    return {"dist_char": dist_char, "cer": cer, "wer": wer}
+    token_sort_ratio = (
+        fuzz.token_sort_ratio(ref_delimited, hyp_delimited) if ref_len > 0 else 0.0
+    )
+
+    return {
+        "dist_char": dist_char,
+        "cer": cer,
+        "wer": wer,
+        "token_sort_ratio": token_sort_ratio,
+    }
 
 
 def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
@@ -147,22 +171,20 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
     - doc_lengths[doc] => length of that doc in the relevant cleaning
     - total_doc_len => sum of all doc lengths in that cleaning
 
-    The dataframe has one column for each document and metric, for example:
+    The dataframe has one row for each document and metric, for example:
     - doc1:dist_char, doc1:doc_len, doc1:cer_pct, doc1:wer_pct, doc2:dist_char, ..., __ALL__:dist_char, ...
 
-    The dataframe has one row for each model used, like pytesseract.
+    The dataframe has one column for each model used, like pytesseract.
 
     Returns the dataframe for the results data.
     """
 
     # One column per document
-    metrics = ["dist_char", "doc_len", "cer_pct", "wer_pct"]
-    df_columns = [
-        f"{doc}:{metric}" for doc in doc_names + ["__ALL__"] for metric in metrics
-    ]
+    metrics = ["dist_char", "doc_len", "cer_pct", "wer_pct", "token_sort_ratio"]
+    # df_columns = [f'{doc}:{metric}' for doc in doc_names + ['__ALL__'] for metric in metrics]
 
     # Create dataframe
-    df = pd.DataFrame(columns=df_columns)
+    df = pd.DataFrame(columns=results_data.keys())
 
     # Populate dataframe
     for model in results_data.keys():
@@ -173,23 +195,36 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
                 doc_len = doc_lengths.get(doc, 0)
                 cer_pct = cell_data["cer"] * 100
                 wer_pct = cell_data["wer"] * 100
+                token_sort_ratio = cell_data["token_sort_ratio"]
 
-                df.at[model, f"{doc}:dist_char"] = dist_char
-                df.at[model, f"{doc}:doc_len"] = doc_len
-                df.at[model, f"{doc}:cer_pct"] = cer_pct
-                df.at[model, f"{doc}:wer_pct"] = wer_pct
+                df.at[f"{doc}:dist_char", model] = dist_char
+                df.at[f"{doc}:doc_len", model] = doc_len
+                df.at[f"{doc}:cer_pct", model] = cer_pct
+                df.at[f"{doc}:wer_pct", model] = wer_pct
+                df.at[f"{doc}:token_sort_ratio", model] = token_sort_ratio
 
         all_data = results_data[model].get("__ALL__", None)
         if all_data is not None:
             dist_char = all_data["dist_char"]
             doc_len = total_doc_len
+            #         cer_pct = all_data["cer"] * 100
+            #         wer_pct = all_data["wer"] * 100
+
+            #         df.at[model, f"__ALL__:dist_char"] = dist_char
+            #         df.at[model, f"__ALL__:doc_len"] = doc_len
+            #         df.at[model, f"__ALL__:cer_pct"] = cer_pct
+            #         df.at[model, f"__ALL__:wer_pct"] = wer_pct
+
+            # return df
             cer_pct = all_data["cer"] * 100
             wer_pct = all_data["wer"] * 100
+            token_sort_ratio = all_data["token_sort_ratio"]
 
-            df.at[model, f"__ALL__:dist_char"] = dist_char
-            df.at[model, f"__ALL__:doc_len"] = doc_len
-            df.at[model, f"__ALL__:cer_pct"] = cer_pct
-            df.at[model, f"__ALL__:wer_pct"] = wer_pct
+            df.at[f"__ALL__:dist_char", model] = dist_char
+            df.at[f"__ALL__:doc_len", model] = doc_len
+            df.at[f"__ALL__:cer_pct", model] = cer_pct
+            df.at[f"__ALL__:wer_pct", model] = wer_pct
+            df.at[f"__ALL__:token_sort_ratio", model] = token_sort_ratio
 
     return df
 
@@ -292,10 +327,10 @@ def get_docs(dir, doc_names):
 def main():
     """
     Prerequisites:
-    - Ground truth text files located at `project_root/ground-truth/txt/kbaa-p#xyz.txt`
+    - Ground truth text files located at `project_root/ground-truth/txt/gt_kbaa-pXYZ.txt`
     - LLM/OCR transcribed files located at:
-        - for LLM transcriptions: `project_root/results/llm_img2txt/<MODEL-NAME>/kbaa-p#xyz.txt`
-        - for OCR transcriptions: `project_root/results/ocr_img2txt/<MODEL-NAME>/kbaa-p#xyz.txt`
+        - for LLM transcriptions: `project_root/results/llm_img2txt/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.txt`
+        - for OCR transcriptions: `project_root/results/ocr_img2txt/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.txt`
 
     The main function will:
     - Gather all ground truth text files
@@ -312,14 +347,12 @@ def main():
 
     # args = parse_arguments()
 
-    script_dir = os.path.dirname(os.path.realpath(__file__))
-    project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
     logger.info("Script directory: %s", script_dir)
     logger.info("Project root: %s", project_root)
 
     # Ground truth
     ground_truth_dir = os.path.join(project_root, "data", "ground-truth", "txt")
-    doc_names = get_doc_names(ground_truth_dir)
+    doc_names = get_doc_names(ground_truth_dir, keep_prefix=False)
 
     # results/ paths
     all_models = get_all_models(
@@ -335,7 +368,9 @@ def main():
 
     # -> Gather ground truths and put into dict:
 
-    ground_truths, ground_truths["__ALL__"] = get_docs(ground_truth_dir, doc_names)
+    ground_truths, ground_truths["__ALL__"] = get_docs(
+        ground_truth_dir, doc_names, name_has_prefix=True
+    )
     doc_lengths_normalized = {
         doc: len(clean_text_normalized(text)) for doc, text in ground_truths.items()
     }
@@ -353,7 +388,9 @@ def main():
     for model_type, model in all_models:
         logger.info("Collecting results for model: %s", model)
         model_path = os.path.join(project_root, "results", model_type, model)
-        results[model], results[model]["__ALL__"] = get_docs(model_path, doc_names)
+        results[model], results[model]["__ALL__"] = get_docs(
+            model_path, doc_names, name_has_prefix=True
+        )
         logger.info("Collected results for model: %s", list(results[model].keys()))
 
     # ===============
