@@ -1,0 +1,12 @@
+name: ocr-benchmarking
+channels:
+  - defaults
+dependencies:
+  - python
+  - pandas
+  - rapidfuzz
+  - pytesseract
+  - anthropic
+  - google-genai
+  - openai
+  - pillow
