@@ -16,11 +16,3 @@
 - Optionally, record the types of errors that appear (I would put the incorrect word (or a word with an incorrect character) on the left and then an arrow -> to the corrected output. If it was a deletion of an entire word or punctuation mark, I would type 'delete' and then what was deleted. If it was an insertion of a missing word or punctuation, I would type 'insert' and then what was inserted)
 
 - Repeat LLM and ground truth process for each image you want the ground truth for
-
-# Revision 6/10:
-- AI Studio version of Gemini UI
-- Gemini 2.5 Pro Preview 6-05 
-- Temperature set to 0
-- Attach PNG, but paste raw ocr text as it struggles with opening txt files
-- Revised prompt:
-    - Please correct the Tesseract transcription of this bibliography page using the scanned image of the page and provide the output in a txt file. Where index numbers in square brackets appear, they should be moved to the end of the entry. Put each entry on a separate line. Only transcribe text that appears on the page and do not attempt to predict missing information or complete cut off entries. Ignore handwritten marginalia when transcribing.

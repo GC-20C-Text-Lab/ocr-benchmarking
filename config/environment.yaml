@@ -5,3 +5,8 @@ dependencies:
   - python
   - pandas
   - rapidfuzz
+  - pytesseract
+  - anthropic
+  - google-genai
+  - openai
+  - pillow
