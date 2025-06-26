@@ -44,7 +44,7 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
 
 sys.path.insert(1, os.path.join(project_root, "src"))
-from tools.file_retrieval import get_doc_names, get_all_models, get_docs
+from tools.file_retrieval import get_doc_names, get_docs
 
 
 # ----------------- Configure Logging -----------------
@@ -288,9 +288,9 @@ def get_all_models(llm_root, ocr_root, ocr_llm_root):
         ]
 
     all_models = (
-        [("llm_img2txt", m) for m in llm_models]
-        + [("ocr_img2txt", m) for m in ocr_models]
-        + [("ocr_llm_img2txt", m) for m in ocr_llm_models]
+        [("llm-img2txt", m) for m in llm_models]
+        + [("ocr-img2txt", m) for m in ocr_models]
+        + [("ocr-llm-img2txt", m) for m in ocr_llm_models]
     )
     # sort by model name
     all_models.sort(key=lambda x: x[1].lower())
@@ -356,9 +356,9 @@ def main():
 
     # results/ paths
     all_models = get_all_models(
-        os.path.join(project_root, "results", "llm_img2txt"),
-        os.path.join(project_root, "results", "ocr_img2txt"),
-        os.path.join(project_root, "results", "ocr_llm_img2txt"),
+        os.path.join(project_root, "results", "llm-img2txt"),
+        os.path.join(project_root, "results", "ocr-img2txt"),
+        os.path.join(project_root, "results", "ocr-llm-img2txt"),
     )
     logger.info(f"Models found: {all_models}")
 
