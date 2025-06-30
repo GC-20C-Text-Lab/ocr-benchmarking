@@ -32,27 +32,52 @@ class Entry(BaseModel):
 class Entries(BaseModel):
     entries: List[Entry]
 
-text = ""
-with open (os.path.join(project_root, "ignore", "gt_kbaa-p003.txt"), "r") as file:
-    text = file.read()
 
-entries = client.chat.completions.create(
-    model = "gpt-4o-mini",
-    response_model=Entries,
-    messages=
-    [
-        {
-            "role": "user", 
-            "content": 
-            [
-                   {
-                       "type" : "text",
-                       "text" : "Convert each entry in this bibliography into structured JSON:\n" + text
-                   }
-            ]
-        }
-    ],
-)
+def txt2json() :
+    text = ""
+    with open (os.path.join(project_root, "ignore", "gt_kbaa-p003.txt"), "r") as file:
+        text = file.read()
+    entries = client.chat.completions.create(
+        model = "gpt-4o-mini",
+        response_model=Entries,
+        messages=
+        [
+            {
+                "role": "user", 
+                "content": 
+                [
+                    {
+                        "type" : "text",
+                        "text" : "Convert each entry in this bibliography into structured JSON:\n" + text
+                    }
+                ]
+            }
+        ],
+    )
+    with open (os.path.join(project_root, "json", "instructor-test-output.json"), "w") as file:
+        file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
-with open (os.path.join(project_root, "json", "instructor-test-output.json"), "w") as file:
-    file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+def img2json() :
+    img = os.path.join(project_root, "json", "kbaa-p003.png")
+    entries = client.chat.completions.create(
+        model = "gpt-4o-mini",
+        response_model=Entries,
+        messages=
+        [
+            {
+                "role": "user", 
+                "content": 
+                [
+                    instructor.Image.from_path(img),
+                    {
+                        "type" : "text",
+                        "text" : "Using this scanned image of the page, convert each entry in this bibliography into structured JSON.\n"
+                    }
+                ]
+            }
+        ],
+    )
+    with open (os.path.join(project_root, "json", "instructor-test-img-output.json"), "w") as file:
+        file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+
+img2json()
