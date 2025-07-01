@@ -1,16 +1,25 @@
-import sys
 from pydantic import BaseModel, Field
 import instructor
 from typing import List
 from openai import OpenAI
+import anthropic
+from google import genai
+from google.genai import Client
 import os
-import json
+#need to install json-ref
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, ".."))
 
 
-client = instructor.from_openai(OpenAI())
+openai_client = instructor.from_openai(OpenAI())  # OpenAI
+anthropic_client = instructor.from_anthropic(anthropic.Anthropic())  # Anthropic
+google_client = instructor.from_genai(Client(), instructor.Mode.GENAI_STRUCTURED_OUTPUTS)  # Google
+
+openai_model = "gpt-4o-mini"
+anthropic_model = "claude-sonnet-4-20250514"
+google_model = "gemini-2.5-flash"
+
 
 class Entry(BaseModel):
     lastname: str = Field(default = "", description = "The author's last name. In the original entries, names are written in Last Name, First Name format. If the name is followed by \"(pseud.)\", this indicates that the name is a pseudonym, but it should still be stored in this field.")
@@ -33,12 +42,12 @@ class Entries(BaseModel):
     entries: List[Entry]
 
 
-def txt2json() :
+def txt2json(client=openai_client, model_name=openai_model) :
     text = ""
-    with open (os.path.join(project_root, "ignore", "gt_kbaa-p003.txt"), "r") as file:
+    with open (os.path.join(project_root, "data", "ground-truth", "txt", "gt_kbaa-p003.txt"), "r") as file:
         text = file.read()
     entries = client.chat.completions.create(
-        model = "gpt-4o-mini",
+        model = model_name,
         response_model=Entries,
         messages=
         [
@@ -57,10 +66,10 @@ def txt2json() :
     with open (os.path.join(project_root, "json", "instructor-test-output.json"), "w") as file:
         file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
-def img2json() :
+def img2json(client=openai_client, model_name=openai_model) :
     img = os.path.join(project_root, "json", "kbaa-p003.png")
     entries = client.chat.completions.create(
-        model = "gpt-4o-mini",
+        model = model_name,
         response_model=Entries,
         messages=
         [
@@ -80,4 +89,27 @@ def img2json() :
     with open (os.path.join(project_root, "json", "instructor-test-img-output.json"), "w") as file:
         file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
-img2json()
+
+
+def gemini_txt2json() :
+    text = ""
+    client = instructor.from_genai(Client(), instructor.Mode.GENAI_STRUCTURED_OUTPUTS)
+
+    with open (os.path.join(project_root, "data", "ground-truth", "txt", "gt_kbaa-p003.txt"), "r") as file:
+        text = file.read()
+    entries = client.chat.completions.create(
+        model = "gemini-2.5-flash",
+        response_model=Entries,
+        messages=
+        [
+            {
+                "role": "user", 
+                "content": "Convert each entry in this bibliography into structured JSON:\n" + text
+            }
+        ],
+    )
+    with open (os.path.join(project_root, "json", "instructor-test-output.json"), "w") as file:
+        file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+
+
+gemini_txt2json()
