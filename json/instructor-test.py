@@ -96,7 +96,6 @@ def openai_img2json() :
 def gemini_txt2json() :
     text = ""
     client = instructor.from_genai(Client(), instructor.Mode.GENAI_STRUCTURED_OUTPUTS)
-
     with open (os.path.join(project_root, "data", "ground-truth", "txt", "gt_kbaa-p003.txt"), "r") as file:
         text = file.read()
     entries = client.chat.completions.create(
@@ -130,5 +129,59 @@ def gemini_img2json() :
     with open (os.path.join(project_root, "json", "geminiimg2json_kbaa-p003.json"), "w") as file:
         file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
+def anthropic_txt2json() :
+    text = ""
+    client = instructor.from_anthropic(anthropic.Anthropic())
+    with open (os.path.join(project_root, "data", "ground-truth", "txt", "gt_kbaa-p003.txt"), "r") as file:
+        text = file.read()
+    entries = client.chat.completions.create(
+        model = "claude-sonnet-4-20250514",
+        response_model=Entries,
+        messages=
+        [
+            {
+                "role": "user", 
+                "content": 
+                [
+                    {
+                        "type" : "text",
+                        "text" : "Convert each entry in this bibliography into structured JSON:\n" + text
+                    }
+                ]
+            }
+        ],
+        max_tokens=10000,
+    )
+    with open (os.path.join(project_root, "json", "anthropictxt2json_kbaa-p003.json"), "w") as file:
+        file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
+def anthropic_img2json() :
+    img = os.path.join(project_root, "json", "kbaa-p003.png")
+    client = instructor.from_anthropic(anthropic.Anthropic())
+    entries = client.chat.completions.create(
+        model = "claude-sonnet-4-20250514",
+        response_model=Entries,
+        messages=
+        [
+            {
+                "role": "user", 
+                "content": 
+                [
+                    instructor.Image.from_path(img),
+                    {
+                        "type" : "text",
+                        "text" : "Using this scanned image of the page, convert each entry in this bibliography into structured JSON.\n"
+                    }
+                ]
+            }
+        ],
+        max_tokens=10000,
+    )
+    with open (os.path.join(project_root, "json", "anthropicimg2json_kbaa-p003.json"), "w") as file:
+        file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+
+
+
+#anthropic_txt2json()
+anthropic_img2json()
 #gemini_img2json()
