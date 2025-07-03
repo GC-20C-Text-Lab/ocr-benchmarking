@@ -6,6 +6,7 @@ Script to get files for running accuracy tests.
 import os
 import glob
 import logging
+import json
 from pathlib import Path
 
 # ----------------- Configure Logging -----------------
@@ -99,7 +100,7 @@ def get_all_models(llm_root, ocr_root, ocr_llm_root, type):
     return all_models
 
 
-def get_docs(dir, doc_names, type, name_has_prefix=False):
+def get_docs(dir, doc_names, doc_format, name_has_prefix=False):
     """
     Returns a 2-tuple containing
     - a dict with
@@ -107,21 +108,51 @@ def get_docs(dir, doc_names, type, name_has_prefix=False):
         - The contents of `dir/{doc}` as the corresponding values
         (assuming `doc` is a key of `doc_name`).
             - If `name_has_prefix` is True, `doc` may be preceded by any prefix.
-    - a string containing the content of all the values in the dict
+    - a string/json depending on `type` specified, containing the content of all the values in the dict
         - in the order given by doc_names
-        - each value is separated by a newline
+        - each value is separated by a newline if text else json with "entries" key, list of entries as values
 
     Since doc_names is a list, all_docs preserves order between different directories.
     """
 
     docs = {}
-    all_docs = ""
+    all_docs = "" if doc_format == "txt" else {"entries": []}
     for doc in doc_names:
-        doc_pattern = f"*{doc}.{type}" if name_has_prefix else f"{doc}.{type}"
+        doc_pattern = (
+            f"*{doc}.{doc_format}" if name_has_prefix else f"{doc}.{doc_format}"
+        )
         paths = glob.glob(os.path.join(dir, doc_pattern))
         with open(paths[0], "r", encoding="utf-8") as f:
-            txt = f.read()
-        docs[doc] = txt
-        all_docs += txt + "\n"
+            # If data is txt parse it as text else parse as json (separate file reading functions)
+            data = f.read()
+            if doc_format == "json":
+                data = json.loads(data)
+        docs[doc] = data
+        if doc_format == "txt":
+            all_docs += data + "\n"
+        elif doc_format == "json":
+            # Aggregates all entries into a single array in the json object
+            all_docs["entries"] += data["entries"]
+    print("s", all_docs["entries"])
 
     return docs, all_docs
+
+
+"""
+all_docs = {
+    "entries": [
+        {
+            "city": "Tokyo..."
+            "city": "Tokyo..."
+        },
+        {
+            "food": "sushi",
+            "food": "sushi",
+        }
+        {
+            All the other entries throughout the entire book
+        },
+        ...
+    ]
+}
+"""

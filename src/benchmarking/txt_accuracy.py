@@ -90,6 +90,45 @@ def clean_text_nonorm(text, index_numbers=True):
     return text.strip()
 
 
+def clean_json_nonorm(data, index_numbers=True):
+    """
+    Minimal cleaning:
+      - Remove index numbers (if specified)
+      - Remove linebreaks/tabs (replace with space)
+      - Remove all instances of \"- \" (dash space; word separated by line break)
+      - Remove extra spaces of number intervals separated by line break
+      - Collapse multiple spaces
+      - Strip leading/trailing
+      - Preserve punctuation, casing, accented letters
+    """
+    for entry in data["entries"]:
+        for key, text in entry.items():
+
+            # Skips over integers since we'll compare them directly
+            if isinstance(text, str):
+
+                # If index_numbers == False, remove index numbers
+                text = (
+                    re.sub(r" *\[ *[0-9]+ *\] *", " ", text)
+                    if not index_numbers
+                    else text
+                )
+
+                # Replace various forms of whitespace with space
+                text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+
+                # Replace multiple spaces with single space
+                text = re.sub(r"\s+", " ", text)
+
+                # Remove instances of "- " for words separated by line break.
+                text = re.sub(r"([A-Za-z]+)- ([a-z]+)", r"\1\2", text)
+
+                # Replace spaces in "- " for number ranges and abbreviations separated by line break.
+                text = re.sub(r"([0-9A-Z]+)- ([0-9A-Z]+)", r"\1-\2", text)
+                entry[key] = text.strip()
+    return data
+
+
 def clean_text_normalized(text, index_numbers=True):
     """
     Fully normalized:
@@ -120,6 +159,57 @@ def clean_text_normalized(text, index_numbers=True):
     # Collapse multiple spaces again
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+
+def clean_json_normalized(data, index_numbers=True):
+    """
+    Fully normalized:
+      - Remove linebreaks/tabs
+      - Remove all instances of \"- \" (dash space; word separated by line break)
+      - Remove extra spaces of number intervals separated by line break
+      - Remove all non-ASCII (accented letters are dropped)
+      - Convert to lowercase
+      - Remove punctuation => keep only [a-z0-9] plus spaces
+      - Collapse multiple spaces
+      - Strip leading/trailing
+
+    Returns:
+        - Cleaned JSON object
+    """
+    for entry in data["entries"]:
+        for key, text in entry.items():
+
+            # Skips over integers since we'll compare them directly
+            if isinstance(text, str):
+                # Remove linebreaks/tabs
+                text = clean_text_nonorm(text, index_numbers)
+
+                # Remove all non-ASCII
+                text = text.encode("ascii", errors="ignore").decode("ascii")
+
+                # Lowercase
+                text = text.lower()
+
+                # Replace periods with a space before removing other punctuation
+                text = re.sub(r"\.", " ", text)
+
+                # Keep only [a-z0-9] + space
+                text = re.sub(r"[^a-z0-9 ]+", "", text)
+
+                # Collapse multiple spaces again
+                text = re.sub(r"\s+", " ", text)
+                entry[key] = text.strip()
+    return data
+
+
+import json
+
+with open(
+    "/Users/muhammadkhalid/Desktop/map2025/ocr-benchmarking/results/json/llm-img2json/gemini-2.0-flash/kbaa-p003.json",
+    "r",
+) as file:
+    raw_json_data = json.load(file)
+print(clean_json_nonorm(raw_json_data))
 
 
 def compute_metrics(ref_text, hyp_text, normalized=False, index_numbers=True):
