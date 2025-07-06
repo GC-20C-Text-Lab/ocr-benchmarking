@@ -102,8 +102,8 @@ def clean_json_nonorm(data, index_numbers=True):
       - Preserve punctuation, casing, accented letters
     """
     for entry in data["entries"]:
-        for key, text in entry.items():
 
+        for key, text in entry.items():
             # Skips over integers since we'll compare them directly
             if isinstance(text, str):
 
@@ -202,17 +202,19 @@ def clean_json_normalized(data, index_numbers=True):
     return data
 
 
-import json
+def flatten(json_text):
+    lines = []
+    for entry in json_text["entries"]:
+        for val in entry.values():
+            if isinstance(val, int):
+                val = str(val)
+            lines.append(val)
+    return " ".join(lines)
 
-with open(
-    "/Users/muhammadkhalid/Desktop/map2025/ocr-benchmarking/results/json/llm-img2json/gemini-2.0-flash/kbaa-p003.json",
-    "r",
-) as file:
-    raw_json_data = json.load(file)
-print(clean_json_nonorm(raw_json_data))
 
-
-def compute_metrics(ref_text, hyp_text, normalized=False, index_numbers=True):
+def compute_metrics(
+    ref_text, hyp_text, doc_format, normalized=False, index_numbers=True
+):
     """
     Compute Levenshtein distance, CER, WER.
     If normalized=True => use clean_text_normalized,
@@ -221,12 +223,30 @@ def compute_metrics(ref_text, hyp_text, normalized=False, index_numbers=True):
     else => remove index numbers
     """
     if normalized:
-        ref_clean = clean_text_normalized(ref_text, index_numbers)
-        hyp_clean = clean_text_normalized(hyp_text, index_numbers)
+        ref_clean = (
+            clean_text_normalized(ref_text, index_numbers)
+            if doc_format == "txt"
+            else clean_json_normalized(ref_text, index_numbers)
+        )
+        hyp_clean = (
+            clean_text_normalized(hyp_text, index_numbers)
+            if doc_format == "txt"
+            else clean_json_normalized(hyp_text, index_numbers)
+        )
     else:
-        ref_clean = clean_text_nonorm(ref_text, index_numbers)
-        hyp_clean = clean_text_nonorm(hyp_text, index_numbers)
-
+        ref_clean = (
+            clean_text_nonorm(ref_text, index_numbers)
+            if doc_format == "txt"
+            else clean_json_nonorm(ref_text, index_numbers)
+        )
+        hyp_clean = (
+            clean_text_nonorm(hyp_text, index_numbers)
+            if doc_format == "txt"
+            else clean_json_nonorm(hyp_text, index_numbers)
+        )
+    if doc_format == "json":
+        ref_clean = flatten(ref_clean)
+        hyp_clean = flatten(hyp_clean)
     dist_char = distance.Levenshtein.distance(ref_clean, hyp_clean)
     ref_len = len(ref_clean)
 

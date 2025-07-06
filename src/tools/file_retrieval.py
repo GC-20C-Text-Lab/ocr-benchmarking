@@ -133,7 +133,6 @@ def get_docs(dir, doc_names, doc_format, name_has_prefix=False):
         elif doc_format == "json":
             # Aggregates all entries into a single array in the json object
             all_docs["entries"] += data["entries"]
-    print("s", all_docs["entries"])
 
     return docs, all_docs
 
