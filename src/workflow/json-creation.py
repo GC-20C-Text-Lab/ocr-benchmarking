@@ -16,7 +16,7 @@ openai_client = instructor.from_openai(OpenAI())  # OpenAI
 anthropic_client = instructor.from_anthropic(anthropic.Anthropic())  # Anthropic
 google_client = instructor.from_genai(Client(), instructor.Mode.GENAI_STRUCTURED_OUTPUTS)  # Google
 
-openai_model = "gpt-4o-mini"
+openai_model = "gpt-4o"
 anthropic_model = "claude-sonnet-4-20250514"
 google_model = "gemini-2.5-flash"
 
@@ -42,13 +42,13 @@ class Entries(BaseModel):
     entries: List[Entry]
 
 
-def openai_txt2json(path, client=openai_client, model_name=openai_model):
+def openai_txt2json(path):
     text = ""
     with open(path,"r") as file:
         text = file.read()
     client = instructor.from_openai(OpenAI())
     entries = client.chat.completions.create(
-        model = "gpt-4o-mini",
+        model = "gpt-4o",
         response_model=Entries,
         messages=
         [
@@ -64,14 +64,15 @@ def openai_txt2json(path, client=openai_client, model_name=openai_model):
             }
         ],
     )
-    with open(path, "w") as file:
-        file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+    return entries.model_dump_json(indent=2, exclude_defaults=True)
+    #with open(path, "w") as file:
+        #file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
 
 def openai_img2json(path):
     client = instructor.from_openai(OpenAI())
     entries = client.chat.completions.create(
-        model = "gpt-4o-mini",
+        model = "gpt-4o",
         response_model=Entries,
         messages=
         [
@@ -79,7 +80,7 @@ def openai_img2json(path):
                 "role": "user", 
                 "content": 
                 [
-                    instructor.Image.from_path(img),
+                    instructor.Image.from_path(path),
                     {
                         "type" : "text",
                         "text" : "Using this scanned image of the page, convert each entry in this bibliography into structured JSON.\n"
@@ -88,15 +89,16 @@ def openai_img2json(path):
             }
         ],
     )
-    with open(path, "w") as file:
-        file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+    return entries.model_dump_json(indent=2, exclude_defaults=True)
+    #with open(path, "w") as file:
+        #file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
 
 def gemini_txt2json(path):
     text = ""
-    client = instructor.from_genai(Client(), instructor.Mode.GENAI_STRUCTURED_OUTPUTS)
     with open(path,"r",) as file:
         text = file.read()
+    client = instructor.from_genai(Client(), instructor.Mode.GENAI_STRUCTURED_OUTPUTS)
     entries = client.chat.completions.create(
         model="gemini-2.5-flash",
         response_model=Entries,
@@ -108,8 +110,9 @@ def gemini_txt2json(path):
             }
         ],
     )
-    with open(path, "w") as file:
-        file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+    return entries.model_dump_json(indent=2, exclude_defaults=True)
+    #with open(path, "w") as file:
+        #file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
 
 def gemini_img2json(path):
@@ -127,18 +130,16 @@ def gemini_img2json(path):
             }
         ],
     )
-    with open(path, "w") as file:
-        file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+    return entries.model_dump_json(indent=2, exclude_defaults=True)
+    #with open(path, "w") as file:
+        #file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
 
-def anthropic_txt2json():
+def anthropic_txt2json(path):
     text = ""
-    client = instructor.from_anthropic(anthropic.Anthropic())
-    with open(
-        os.path.join(project_root, "data", "ground-truth", "txt", "gt_kbaa-p003.txt"),
-        "r",
-    ) as file:
+    with open(path,"r") as file:
         text = file.read()
+    client = instructor.from_anthropic(anthropic.Anthropic())
     entries = client.chat.completions.create(
         model="claude-sonnet-4-20250514",
         response_model=Entries,
@@ -156,14 +157,12 @@ def anthropic_txt2json():
         ],
         max_tokens=10000,
     )
-    with open(
-        os.path.join(project_root, "json", "anthropictxt2json_kbaa-p003.json"), "w"
-    ) as file:
-        file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+    return entries.model_dump_json(indent=2, exclude_defaults=True)
+    #with open(os.path.join(project_root, "json", "anthropictxt2json_kbaa-p003.json"), "w") as file:
+        #file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
 
-def anthropic_img2json():
-    img = os.path.join(project_root, "json", "kbaa-p003.png")
+def anthropic_img2json(path):
     client = instructor.from_anthropic(anthropic.Anthropic())
     entries = client.chat.completions.create(
         model="claude-sonnet-4-20250514",
@@ -172,7 +171,7 @@ def anthropic_img2json():
             {
                 "role": "user",
                 "content": [
-                    instructor.Image.from_path(img),
+                    instructor.Image.from_path(path),
                     {
                         "type": "text",
                         "text": "Using this scanned image of the page, convert each entry in this bibliography into structured JSON.\n",
@@ -182,10 +181,9 @@ def anthropic_img2json():
         ],
         max_tokens=10000,
     )
-    with open(
-        os.path.join(project_root, "json", "anthropicimg2json_kbaa-p003.json"), "w"
-    ) as file:
-        file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+    return entries.model_dump_json(indent=2, exclude_defaults=True)
+    #with open(os.path.join(project_root, "json", "anthropicimg2json_kbaa-p003.json"), "w") as file:
+        #file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
 
 # anthropic_txt2json()
