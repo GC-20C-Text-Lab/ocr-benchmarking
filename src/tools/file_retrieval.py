@@ -38,11 +38,10 @@ def get_doc_names(dir, type, keep_prefix=True, prefix_delimiter="_"):
         doc_names = list(
             map(lambda name: str.split(name, prefix_delimiter)[-1], doc_names)
         )
-    print("Doc Names:", doc_names)
     return doc_names
 
 
-def get_all_models(llm_root, ocr_root, ocr_llm_root, type):
+def get_all_models(type, *argv):
     """
     NOTE: This example is for txt files, for JSON, specify in the type parameter
     llm_root is the directory where LLM model folders are located.
@@ -69,31 +68,12 @@ def get_all_models(llm_root, ocr_root, ocr_llm_root, type):
         - "ocr_img2txt" for OCR models
     - the model name (found using the directory structure)
     """
-
-    llm_models = []
-    if os.path.isdir(llm_root):
-        llm_models = [
-            m for m in os.listdir(llm_root) if os.path.isdir(os.path.join(llm_root, m))
-        ]
-    ocr_models = []
-    if os.path.isdir(ocr_root):
-        ocr_models = [
-            m for m in os.listdir(ocr_root) if os.path.isdir(os.path.join(ocr_root, m))
-        ]
-
-    ocr_llm_models = []
-    if os.path.isdir(ocr_llm_root):
-        ocr_llm_models = [
-            m
-            for m in os.listdir(ocr_llm_root)
-            if os.path.isdir(os.path.join(ocr_llm_root, m))
-        ]
-
-    all_models = (
-        [(f"llm-img2{type}", m) for m in llm_models]
-        + [("ocr-img2txt", m) for m in ocr_models]
-        + [(f"ocr-llm-img2{type}", m) for m in ocr_llm_models]
-    )
+    all_models = []
+    for arg in argv:
+        if os.path.isdir(arg):
+            print(arg)
+            for model in os.listdir(arg):
+                all_models.append((os.path.basename(arg), model))
     # sort by model name
     all_models.sort(key=lambda x: x[1].lower())
 
