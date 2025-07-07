@@ -6,3 +6,7 @@ data/*
 .DS_Store
 __pycache__/
 *ground-truth/
+ignore/*
+json/old
+old-results
+benchmarking-results
