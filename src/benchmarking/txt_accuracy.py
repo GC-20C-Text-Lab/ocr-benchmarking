@@ -258,7 +258,7 @@ def compute_metrics(
     hyp_delimited = re.sub(r"\.", " ", hyp_clean)
     processed_words = jiwer.process_words(ref_clean, hyp_clean)
     dist_word = processed_words.insertions + processed_words.deletions + processed_words.substitutions
-    wer = processed_words.wer if len(ref_words) > 0 else 0.0
+    wer = processed_words.wer if len(ref_clean) > 0 else 0.0
 
     token_sort_ratio = (
         fuzz.token_sort_ratio(ref_delimited, hyp_delimited) if ref_len > 0 else 0.0
