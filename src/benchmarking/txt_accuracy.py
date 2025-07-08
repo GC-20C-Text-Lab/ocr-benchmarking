@@ -39,6 +39,7 @@ from rapidfuzz import distance, fuzz
 import pandas as pd
 from datetime import datetime
 import sys
+import jiwer
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
@@ -255,12 +256,9 @@ def compute_metrics(
     # For WER, split by whitespace and full stops
     ref_delimited = re.sub(r"\.", " ", ref_clean)
     hyp_delimited = re.sub(r"\.", " ", hyp_clean)
-    ref_words = ref_delimited.split()
-    hyp_words = hyp_delimited.split()
-    dist_word = distance.Levenshtein.distance(
-        "\n".join(ref_words), "\n".join(hyp_words)
-    )
-    wer = dist_word / len(ref_words) if len(ref_words) > 0 else 0.0
+    processed_words = jiwer.process_words(ref_clean, hyp_clean)
+    dist_word = processed_words.insertions + processed_words.deletions + processed_words.substitutions
+    wer = processed_words.wer if len(ref_words) > 0 else 0.0
 
     token_sort_ratio = (
         fuzz.token_sort_ratio(ref_delimited, hyp_delimited) if ref_len > 0 else 0.0
