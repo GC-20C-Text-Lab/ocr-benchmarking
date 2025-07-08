@@ -44,7 +44,7 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
 
 sys.path.insert(1, os.path.join(project_root, "src"))
-from tools.file_retrieval import get_doc_names, get_all_models, get_docs
+from tools.file_retrieval import get_doc_names, get_docs
 
 
 # ----------------- Configure Logging -----------------
@@ -90,6 +90,45 @@ def clean_text_nonorm(text, index_numbers=True):
     return text.strip()
 
 
+def clean_json_nonorm(data, index_numbers=True):
+    """
+    Minimal cleaning:
+      - Remove index numbers (if specified)
+      - Remove linebreaks/tabs (replace with space)
+      - Remove all instances of \"- \" (dash space; word separated by line break)
+      - Remove extra spaces of number intervals separated by line break
+      - Collapse multiple spaces
+      - Strip leading/trailing
+      - Preserve punctuation, casing, accented letters
+    """
+    for entry in data["entries"]:
+
+        for key, text in entry.items():
+            # Skips over integers since we'll compare them directly
+            if isinstance(text, str):
+
+                # If index_numbers == False, remove index numbers
+                text = (
+                    re.sub(r" *\[ *[0-9]+ *\] *", " ", text)
+                    if not index_numbers
+                    else text
+                )
+
+                # Replace various forms of whitespace with space
+                text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+
+                # Replace multiple spaces with single space
+                text = re.sub(r"\s+", " ", text)
+
+                # Remove instances of "- " for words separated by line break.
+                text = re.sub(r"([A-Za-z]+)- ([a-z]+)", r"\1\2", text)
+
+                # Replace spaces in "- " for number ranges and abbreviations separated by line break.
+                text = re.sub(r"([0-9A-Z]+)- ([0-9A-Z]+)", r"\1-\2", text)
+                entry[key] = text.strip()
+    return data
+
+
 def clean_text_normalized(text, index_numbers=True):
     """
     Fully normalized:
@@ -122,7 +161,60 @@ def clean_text_normalized(text, index_numbers=True):
     return text.strip()
 
 
-def compute_metrics(ref_text, hyp_text, normalized=False, index_numbers=True):
+def clean_json_normalized(data, index_numbers=True):
+    """
+    Fully normalized:
+      - Remove linebreaks/tabs
+      - Remove all instances of \"- \" (dash space; word separated by line break)
+      - Remove extra spaces of number intervals separated by line break
+      - Remove all non-ASCII (accented letters are dropped)
+      - Convert to lowercase
+      - Remove punctuation => keep only [a-z0-9] plus spaces
+      - Collapse multiple spaces
+      - Strip leading/trailing
+
+    Returns:
+        - Cleaned JSON object
+    """
+    for entry in data["entries"]:
+        for key, text in entry.items():
+
+            # Skips over integers since we'll compare them directly
+            if isinstance(text, str):
+                # Remove linebreaks/tabs
+                text = clean_text_nonorm(text, index_numbers)
+
+                # Remove all non-ASCII
+                text = text.encode("ascii", errors="ignore").decode("ascii")
+
+                # Lowercase
+                text = text.lower()
+
+                # Replace periods with a space before removing other punctuation
+                text = re.sub(r"\.", " ", text)
+
+                # Keep only [a-z0-9] + space
+                text = re.sub(r"[^a-z0-9 ]+", "", text)
+
+                # Collapse multiple spaces again
+                text = re.sub(r"\s+", " ", text)
+                entry[key] = text.strip()
+    return data
+
+
+def flatten(json_text):
+    lines = []
+    for entry in json_text["entries"]:
+        for val in entry.values():
+            if isinstance(val, int):
+                val = str(val)
+            lines.append(val)
+    return " ".join(lines)
+
+
+def compute_metrics(
+    ref_text, hyp_text, doc_format, normalized=False, index_numbers=True
+):
     """
     Compute Levenshtein distance, CER, WER.
     If normalized=True => use clean_text_normalized,
@@ -131,12 +223,30 @@ def compute_metrics(ref_text, hyp_text, normalized=False, index_numbers=True):
     else => remove index numbers
     """
     if normalized:
-        ref_clean = clean_text_normalized(ref_text, index_numbers)
-        hyp_clean = clean_text_normalized(hyp_text, index_numbers)
+        ref_clean = (
+            clean_text_normalized(ref_text, index_numbers)
+            if doc_format == "txt"
+            else clean_json_normalized(ref_text, index_numbers)
+        )
+        hyp_clean = (
+            clean_text_normalized(hyp_text, index_numbers)
+            if doc_format == "txt"
+            else clean_json_normalized(hyp_text, index_numbers)
+        )
     else:
-        ref_clean = clean_text_nonorm(ref_text, index_numbers)
-        hyp_clean = clean_text_nonorm(hyp_text, index_numbers)
-
+        ref_clean = (
+            clean_text_nonorm(ref_text, index_numbers)
+            if doc_format == "txt"
+            else clean_json_nonorm(ref_text, index_numbers)
+        )
+        hyp_clean = (
+            clean_text_nonorm(hyp_text, index_numbers)
+            if doc_format == "txt"
+            else clean_json_nonorm(hyp_text, index_numbers)
+        )
+    if doc_format == "json":
+        ref_clean = flatten(ref_clean)
+        hyp_clean = flatten(hyp_clean)
     dist_char = distance.Levenshtein.distance(ref_clean, hyp_clean)
     ref_len = len(ref_clean)
 
@@ -288,9 +398,9 @@ def get_all_models(llm_root, ocr_root, ocr_llm_root):
         ]
 
     all_models = (
-        [("llm_img2txt", m) for m in llm_models]
-        + [("ocr_img2txt", m) for m in ocr_models]
-        + [("ocr_llm_img2txt", m) for m in ocr_llm_models]
+        [("llm-img2txt", m) for m in llm_models]
+        + [("ocr-img2txt", m) for m in ocr_models]
+        + [("ocr-llm-img2txt", m) for m in ocr_llm_models]
     )
     # sort by model name
     all_models.sort(key=lambda x: x[1].lower())
@@ -356,9 +466,9 @@ def main():
 
     # results/ paths
     all_models = get_all_models(
-        os.path.join(project_root, "results", "llm_img2txt"),
-        os.path.join(project_root, "results", "ocr_img2txt"),
-        os.path.join(project_root, "results", "ocr_llm_img2txt"),
+        os.path.join(project_root, "results", "llm-img2txt"),
+        os.path.join(project_root, "results", "ocr-img2txt"),
+        os.path.join(project_root, "results", "ocr-llm-img2txt"),
     )
     logger.info(f"Models found: {all_models}")
 
