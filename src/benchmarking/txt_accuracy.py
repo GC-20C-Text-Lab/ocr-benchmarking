@@ -269,6 +269,7 @@ def compute_metrics(
     return {
         "dist_char": dist_char,
         "cer": cer,
+        "dist_word": dist_word,
         "wer": wer,
         "token_sort_ratio": token_sort_ratio,
     }
