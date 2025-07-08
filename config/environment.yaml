@@ -10,3 +10,7 @@ dependencies:
   - google-genai
   - openai
   - pillow
+  - instructor
+  - pydantic
+  - typing
+  - json-ref
