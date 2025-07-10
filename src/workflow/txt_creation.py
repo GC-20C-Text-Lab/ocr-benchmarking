@@ -1,4 +1,5 @@
 import base64
+import random
 from pydantic import BaseModel, Field
 import instructor
 from typing import List
@@ -100,57 +101,55 @@ async def openai_img_txt2txt_async(input_img_path, input_txt_path, output_path):
     async with aiofiles.open(output_path, "w") as f:
         await f.write(response.choices[0].message.content)
 
-async def process_single_async(input_img_paths, output_dir, processor, doc_format, model):
+async def retry_with_backoff(fn, retries=5, base_delay=2, *args):
+    for attempt in range(retries):
+        try:
+            return await fn(*args)
+        except Exception as e:
+            if attempt < retries - 1:
+                delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                print(f"Retrying in {delay:.2f}s after error: {e}")
+                await asyncio.sleep(delay)
+            else:
+                print(f"Failed after {retries} attempts: {e}")
+                raise
+
+
+
+async def limited_processor(semaphore, processor, *args):
+    async with semaphore:
+        return await retry_with_backoff(processor, *args)
+
+async def process_single_async(
+    input_img_paths, output_dir, processor, model
+):
     # Array to hold all the tasks to be completed including writing to files
     tasks = []
     n = len(input_img_paths)
-    for i in range(n//2):
+    max_concurrency = 4
+    semaphore = asyncio.Semaphore(max_concurrency)
+
+    for i in range(n):
         output_path = str(
             output_dir
             / model
-            / (input_img_paths[i].stem + f".{doc_format}")
+            / (input_img_paths[i].stem + ".json")
         )
+
         # Append the tasks to be executed outside the for loop
-        tasks.append(processor(input_img_paths[i], output_path))
+        task = limited_processor(semaphore, processor, input_img_paths[i], output_path)
+        tasks.append(task)
     await asyncio.gather(*tasks)
-    await asyncio.sleep(60)
-    tasks = []
-    for i in range(n//2, n):
-        output_path = str(
-            output_dir
-            / model
-            / (input_img_paths[i].stem + f".{doc_format}")
-        )
-        # Append the tasks to be executed outside the for loop
-        tasks.append(processor(input_img_paths[i], output_path))
-    await asyncio.gather(*tasks)
-
-
-
-async def process_double_async(input_img_paths, input_txt_paths, output_dir, processor, doc_format, model):
-    # Array to hold all the tasks to be completed including writing to files
-    tasks = []
+    
+async def process_double_async(input_img_paths, input_txt_paths, output_dir, processor, model):
     n = len(input_img_paths)
-    # count = 0  # THis is just to test out # TODO: remove in final pipeline
-    for i in range(n//2):
-        output_path = str(
-            output_dir
-            / model
-            / (input_img_paths[i].stem + f".{doc_format}")
-        )
-
-        # Append the tasks to be executed outside the for loop
-        tasks.append(processor(input_img_paths[i], input_txt_paths[i], output_path))
-    await asyncio.gather(*tasks)
-    await asyncio.sleep(60)
+    max_concurrency = 4  # Safe limit for Tier 1
+    semaphore = asyncio.Semaphore(max_concurrency)
     tasks = []
-    for i in range(n//2, n):
-        output_path = str(
-            output_dir
-            / model
-            / (input_img_paths[i].stem + f".{doc_format}")
-        )
 
-        # Append the tasks to be executed outside the for loop
-        tasks.append(processor(input_img_paths[i], input_txt_paths[i], output_path))
+    for i in range(n):
+        output_path = str(output_dir / model / (input_img_paths[i].stem + ".txt"))
+        task = limited_processor(semaphore, processor, input_img_paths[i], input_txt_paths[i], output_path)
+        tasks.append(task)
+
     await asyncio.gather(*tasks)
