@@ -43,8 +43,8 @@ import sys
 script_dir = os.path.dirname(os.path.realpath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
 
-sys.path.insert(1, os.path.join(project_root, "src"))
-from tools.file_retrieval import get_doc_names, get_docs
+# sys.path.insert(1, os.path.join(project_root, "src"))
+from file_retrieval import get_doc_names, get_docs
 
 
 # ----------------- Configure Logging -----------------
