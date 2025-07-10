@@ -120,12 +120,9 @@ def get_docs(dir, doc_names, doc_format, name_has_prefix=False):
 def get_paths(dir, doc_format, name_has_prefix=False):
     # Add all filenames in images directory into the `filenames` array with the ENTIRE filepath
     filepaths = []
-    count = 0
     for path in dir.iterdir():
-        if count < 10:
-            if path.suffix.lower() == f".{doc_format}" and path.is_file():
-                filepaths.append(path)
-                count += 1
+        if path.suffix.lower() == f".{doc_format}" and path.is_file():
+            filepaths.append(path)
     return filepaths
 
 
