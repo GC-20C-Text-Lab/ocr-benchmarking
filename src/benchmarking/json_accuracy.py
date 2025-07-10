@@ -31,6 +31,7 @@ import re
 import glob
 import argparse
 import logging
+from typing import Callable
 from rapidfuzz.distance import JaroWinkler
 import pandas as pd
 import numpy as np
@@ -167,7 +168,60 @@ def filter_expected_columns(df):
 
 # ----------------- Matching Comparisons -----------------
 
-def compare_dataframes(gt_df, pred_df, method, options={}):
+def make_match_dataframe(
+    gt_df: pd.DataFrame,
+    pred_df: pd.DataFrame,
+    cell_matcher: Callable[[any, any, dict[str, any]], bool],
+    options: dict[str, any]
+) -> pd.DataFrame:
+    """
+    Create a boolean dataframe whose cell is True if the two corresponding cells in gt_df and
+    pred_df match using the cell_matcher predicate function.
+
+    gt_df and pred_df must have the same dimensions.
+    """
+    match_df = pd.DataFrame().reindex_like(gt_df)
+
+    nrows = gt_df.shape[0]
+    ncols = len(EXPECTED_COLUMNS)
+
+    if nrows != pred_df.shape[0]:
+        raise ValueError("gt_df and pred_df do not have correct dimensions")
+
+    for row in range(nrows):
+        for col in range(ncols):
+            match_df.iat[row, col] = cell_matcher(gt_df.iat[row, col], pred_df.iat[row, col], options)
+    
+    return match_df
+
+
+def exact_cell_matcher(gt_cell, pred_cell, options):
+    return gt_cell == pred_cell
+
+
+def normalized_cell_matcher(gt_cell, pred_cell, options):
+    """
+    If either the ground-truth and/or prediction are strings, remove non-ASCII/punctuation; make lower-case.
+    Then check for exact match.
+    """
+    norm_gt = ascii_only_punct_removed_lower(gt_cell) if isinstance(gt_cell, str) else gt_cell
+    norm_pr = ascii_only_punct_removed_lower(pred_cell) if isinstance(pred_cell, str) else pred_cell
+    return norm_gt == norm_pr
+
+
+def fuzzy_cell_matcher(gt_cell, pred_cell, options):
+    """
+    Use the Jaro-Winkler similarity if both the ground-truth and prediction are strings.
+    Use options["threshold"] for threshold.
+    Otherwise, check for exact match.
+    """
+    if isinstance(gt_cell, str) and isinstance(pred_cell, str):
+        return JaroWinkler.similarity(gt_cell, pred_cell) >= options["threshold"]
+    else:
+        return gt_cell == pred_cell
+
+
+def compare_dataframes(gt_df, pred_df, method, options={"threshold": FUZZY_THRESHOLD}):
     # Check if any dataframe is empty
     if gt_df is None or pred_df is None:
         return {
@@ -190,70 +244,121 @@ def compare_dataframes(gt_df, pred_df, method, options={}):
             "pred_nrows": pred_rows,
             "gt_nrows": gt_rows,
         }
-    
-    if method == 'exact':
-        matches = (gt_df.values == pred_df.values).sum()
-        total = gt_rows * len(EXPECTED_COLUMNS)
-        return {
-            "matches": matches,
-            "total": total,
-            "mismatch_bool": False,
-            "pred_nrows": pred_rows,
-            "gt_nrows": gt_rows,
-        }
-    
-    elif method == "normalized":
-        total_cells = gt_rows * len(EXPECTED_COLUMNS)
-        match_count = 0
 
-        for row_idx in range(gt_rows):
-            for col_idx in range(len(EXPECTED_COLUMNS)):
-                gt_val = gt_df.iat[row_idx, col_idx]
-                pr_val = pred_df.iat[row_idx, col_idx]
-                # Apply "normalized" pipeline:
-                if isinstance(gt_val, str) and isinstance(pr_val, str):
-                    norm_gt = ascii_only_punct_removed_lower(gt_val)
-                    norm_pr = ascii_only_punct_removed_lower(pr_val)
-                else:
-                    norm_gt = gt_val
-                    norm_pr = pr_val
-                if norm_gt == norm_pr:
-                    match_count += 1
+    # Select matching method
+    matcher = {
+        "exact": exact_cell_matcher,
+        "normalized": normalized_cell_matcher,
+        "fuzzy": fuzzy_cell_matcher
+    }.get(method, "exact")
 
-        return {
-            "matches": match_count,
-            "total": total_cells,
-            "mismatch_bool": False,
-            "pred_nrows": pred_rows,
-            "gt_nrows": gt_rows,
-        }
+    # Create dataframe for matches and results dict
+    match_df = make_match_dataframe(gt_df, pred_df, matcher, options)
+    results = {}
+
+    # Count number of True values in each column and add to returned results
+    total_matches = 0
+    for col in match_df.columns:
+        col_matches = match_df[col].sum()
+        results[f"__COL__:{col}"] = col_matches
+        total_matches += col_matches
     
-    elif method == "fuzzy":
-        total_cells = gt_rows * len(EXPECTED_COLUMNS)
-        match_count = 0
-        for row_idx in range(gt_rows):
-            for col_idx in range(len(EXPECTED_COLUMNS)):
-                val_gt = gt_df.iat[row_idx, col_idx]
-                val_pr = pred_df.iat[row_idx, col_idx]
+    results["matches"] = total_matches
+    results["total"] = gt_rows * len(EXPECTED_COLUMNS)
+    results["mismatch_bool"] = False
+    results["pred_nrows"] = pred_rows
+    results["gt_nrows"] = gt_rows
 
-                if isinstance(val_gt, str) and isinstance(val_pr, str):
-                    sim = JaroWinkler.similarity(val_gt, val_pr)
-                    if sim >= options["threshold"]:
-                        match_count += 1
-                else:
-                    if val_gt == val_pr:
-                        match_count += 1
+    return results
 
-        return {
-            "matches": match_count,
-            "total": total_cells,
-            "mismatch_bool": False,
-            "pred_nrows": pred_rows,
-            "gt_nrows": gt_rows,
-        }
+
+# def compare_dataframes_old_method(gt_df, pred_df, method, options={}):
+#     # Check if any dataframe is empty
+#     if gt_df is None or pred_df is None:
+#         return {
+#             "matches": np.nan,
+#             "total": np.nan,
+#             "mismatch_bool": True,
+#             "pred_nrows": 0,
+#             "gt_nrows": 0,
+#         }
+
+#     # Check for row mismatch
+#     gt_rows = gt_df.shape[0]
+#     pred_rows = pred_df.shape[0]
+
+#     if gt_rows != pred_rows:
+#         return {
+#             "matches": np.nan,
+#             "total": np.nan,
+#             "mismatch_bool": True,
+#             "pred_nrows": pred_rows,
+#             "gt_nrows": gt_rows,
+#         }
     
-    else:
-        raise ValueError("Invalid method for dataframe comparison")
+#     if method == 'exact':
+#         matches = (gt_df.values == pred_df.values).sum()
+#         total = gt_rows * len(EXPECTED_COLUMNS)
+#         return {
+#             "matches": matches,
+#             "total": total,
+#             "mismatch_bool": False,
+#             "pred_nrows": pred_rows,
+#             "gt_nrows": gt_rows,
+#         }
+    
+#     elif method == "normalized":
+#         total_cells = gt_rows * len(EXPECTED_COLUMNS)
+#         match_count = 0
+
+#         for row_idx in range(gt_rows):
+#             for col_idx in range(len(EXPECTED_COLUMNS)):
+#                 gt_val = gt_df.iat[row_idx, col_idx]
+#                 pr_val = pred_df.iat[row_idx, col_idx]
+#                 # Apply "normalized" pipeline:
+#                 if isinstance(gt_val, str) and isinstance(pr_val, str):
+#                     norm_gt = ascii_only_punct_removed_lower(gt_val)
+#                     norm_pr = ascii_only_punct_removed_lower(pr_val)
+#                 else:
+#                     norm_gt = gt_val
+#                     norm_pr = pr_val
+#                 if norm_gt == norm_pr:
+#                     match_count += 1
+
+#         return {
+#             "matches": match_count,
+#             "total": total_cells,
+#             "mismatch_bool": False,
+#             "pred_nrows": pred_rows,
+#             "gt_nrows": gt_rows,
+#         }
+    
+#     elif method == "fuzzy":
+#         total_cells = gt_rows * len(EXPECTED_COLUMNS)
+#         match_count = 0
+#         for row_idx in range(gt_rows):
+#             for col_idx in range(len(EXPECTED_COLUMNS)):
+#                 val_gt = gt_df.iat[row_idx, col_idx]
+#                 val_pr = pred_df.iat[row_idx, col_idx]
+
+#                 if isinstance(val_gt, str) and isinstance(val_pr, str):
+#                     sim = JaroWinkler.similarity(val_gt, val_pr)
+#                     if sim >= options["threshold"]:
+#                         match_count += 1
+#                 else:
+#                     if val_gt == val_pr:
+#                         match_count += 1
+
+#         return {
+#             "matches": match_count,
+#             "total": total_cells,
+#             "mismatch_bool": False,
+#             "pred_nrows": pred_rows,
+#             "gt_nrows": gt_rows,
+#         }
+    
+#     else:
+#         raise ValueError("Invalid method for dataframe comparison")
 
 
 def compare_dataframes_exact(gt_df, pred_df):
@@ -291,6 +396,7 @@ def build_dataframe(title, doc_names, results_data):
     - results_data[model][doc] => (matches, total, mismatch_bool, pred_nrows)
 
     The dataframe has one row for each document and metric:
+    - `docN:__COL__:<col_name>`: Number of matching cells in `col_name`. Only exists if row counts match.
     - `docN:matches`: Number of matching cells in document if row counts match, otherwise NaN
     - `docN:total`: Total matching cells in document if row counts match, otherwise NaN
     - `docN:matches_pct`: Percent of matching cells if row counts match, otherwise NaN
@@ -299,20 +405,19 @@ def build_dataframe(title, doc_names, results_data):
     - `docN:gt_nrows`: Number of rows in the ground truth data.
 
     The dataframe also has rows for aggregate metrics, namely:
+    - `__ALL__:__COL__:<col_name>`: Number of matching cells in `col_name` for all pages where row counts match.
     - `__ALL__:matches`: Number of matching cells among pages with matching row counts
     - `__ALL__:total`: Total number of cells among pages with matching row counts
     - `__ALL__:matches_pct`: `__ALL__:matches` divided by `__ALL__:total`, or 0 if `__ALL__:total` is 0.
     - `__ALL__:mismatched_dim_count`: Number of pages with mismatched row counts.
     - `__ALL__:pred_nrows`: Total number of rows in the prediction.
     - `__ALL__:gt_nrows`: Total number of rows in the ground truth.
+    - `__ALL__:counted_nrows`: Total number of rows from pages with matching row counts.
 
     The dataframe has one column for each model used, like pytesseract.
 
     Returns the dataframe for the results data.
     """
-
-    # One column per document
-    metrics = ["matches", "total", "mismatch_bool", "pred_nrows"]
 
     logger.info("Building dataframe \"%s\" with documents %s", title, doc_names)
 
@@ -326,12 +431,19 @@ def build_dataframe(title, doc_names, results_data):
         model_sum_mismatches = 0
         model_sum_pred_nrows = 0
         model_sum_gt_nrows = 0
+        model_sum_counted_nrows = 0
+        model_col_results = {}
 
         for doc in doc_names:
             cell_data = results_data[model].get(doc, None)
+
             if cell_data is not None:
-                df.at[f"{doc}:matches", model] = cell_data["matches"]
-                df.at[f"{doc}:total", model] = cell_data["total"]
+                # Move all results from cell_data to returned dataframe
+                for key in cell_data.keys():
+                    df.at[f"{doc}:{key}", model] = cell_data[key]
+                    if key.startswith("__COL__:"):
+                        model_col_results[key] = model_col_results.get(key, 0) + cell_data[key]
+
                 df.at[f"{doc}:matches_pct", model] = (
                     (cell_data["matches"] / cell_data["total"]) * 100
                         if (not cell_data["mismatch_bool"]) or cell_data["total"] > 0
@@ -339,22 +451,23 @@ def build_dataframe(title, doc_names, results_data):
                             if cell_data["mismatch_bool"]
                             else 0
                 )
-                df.at[f"{doc}:mismatch_bool", model] = cell_data["mismatch_bool"]
-                df.at[f"{doc}:pred_nrows", model] = cell_data["pred_nrows"]
-                df.at[f"{doc}:gt_nrows", model] = cell_data["gt_nrows"]
 
                 model_sum_matches += cell_data["matches"] if not pd.isna(cell_data["matches"]) else 0
                 model_sum_total += cell_data["total"] if not pd.isna(cell_data["total"]) else 0
                 model_sum_mismatches += 1 if cell_data["mismatch_bool"] else 0
                 model_sum_pred_nrows += cell_data["pred_nrows"]
                 model_sum_gt_nrows += cell_data["gt_nrows"]
+                model_sum_counted_nrows += cell_data["gt_nrows"] if not cell_data["mismatch_bool"] else 0
         
+        for key in model_col_results.keys():
+            df.at[f"__ALL__:{key}", model] = model_col_results[key]
         df.at["__ALL__:matches", model] = model_sum_matches
         df.at["__ALL__:total", model] = model_sum_total
         df.at["__ALL__:matches_pct", model] = (model_sum_matches / model_sum_total) * 100 if model_sum_total > 0 else 0
         df.at["__ALL__:mismatched_dim_count", model] = model_sum_mismatches
         df.at["__ALL__:pred_nrows", model] = model_sum_pred_nrows
         df.at["__ALL__:gt_nrows", model] = model_sum_gt_nrows
+        df.at["__ALL__:counted_nrows", model] = model_sum_counted_nrows
 
     return df
 
