@@ -117,6 +117,15 @@ def get_docs(dir, doc_names, doc_format, name_has_prefix=False):
     return docs, all_docs
 
 
+def get_paths(dir, doc_format, name_has_prefix=False):
+    # Add all filenames in images directory into the `filenames` array with the ENTIRE filepath
+    filepaths = []
+    for path in dir.iterdir():
+        if path.suffix.lower() == f".{doc_format}" and path.is_file():
+            filepaths.append(path)
+    return filepaths
+
+
 """
 all_docs = {
     "entries": [
