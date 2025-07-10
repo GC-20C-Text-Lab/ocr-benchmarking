@@ -105,11 +105,11 @@ async def process_single_async(input_img_paths, output_dir, processor, doc_forma
     # Array to hold all the tasks to be completed including writing to files
     tasks = []
 
-    count = 0  # THis is just to test out # TODO: remove in final pipeline
+    # count = 0  # THis is just to test out # TODO: remove in final pipeline
     for input_path in input_img_paths:
-        if count == 1:
-            break
-        count += 1
+        # if count == 1:
+        #     break
+        # count += 1
         output_path = str(
             output_dir
             / model
@@ -126,11 +126,11 @@ async def process_double_async(input_img_paths, input_txt_paths, output_dir, pro
     tasks = []
     n = len(input_img_paths)
 
-    count = 0  # THis is just to test out # TODO: remove in final pipeline
+    # count = 0  # THis is just to test out # TODO: remove in final pipeline
     for i in range(n):
-        if count == 1:
-            break
-        count += 1
+        # if count == 1:
+        #     break
+        # count += 1
         output_path = str(
             output_dir
             / model

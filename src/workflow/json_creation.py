@@ -358,11 +358,11 @@ async def process_json_async(
     # Array to hold all the tasks to be completed including writing to files
     tasks = []
 
-    count = 0  # THis is just to test out # TODO: remove in final pipeline
+    # count = 0  # THis is just to test out # TODO: remove in final pipeline
     for input_path in input_paths:
-        if count == 1:
-            break
-        count += 1
+        # if count == 1:
+        #     break
+        # count += 1
         output_path = str(
             output_dir
             / model
