@@ -104,33 +104,48 @@ async def openai_img_txt2txt_async(input_img_path, input_txt_path, output_path):
 async def process_single_async(input_img_paths, output_dir, processor, doc_format, model):
     # Array to hold all the tasks to be completed including writing to files
     tasks = []
-
-    # count = 0  # THis is just to test out # TODO: remove in final pipeline
-    for input_path in input_img_paths:
-        # if count == 1:
-        #     break
-        # count += 1
+    n = len(input_img_paths)
+    for i in range(n//2):
         output_path = str(
             output_dir
             / model
-            / (input_path.stem + f".{doc_format}")
+            / (input_img_paths[i].stem + f".{doc_format}")
         )
-
         # Append the tasks to be executed outside the for loop
-        tasks.append(processor(input_path, output_path))
+        tasks.append(processor(input_img_paths[i], output_path))
     await asyncio.gather(*tasks)
+    await asyncio.sleep(60)
+    tasks = []
+    for i in range(n//2, n):
+        output_path = str(
+            output_dir
+            / model
+            / (input_img_paths[i].stem + f".{doc_format}")
+        )
+        # Append the tasks to be executed outside the for loop
+        tasks.append(processor(input_img_paths[i], output_path))
+    await asyncio.gather(*tasks)
+
 
 
 async def process_double_async(input_img_paths, input_txt_paths, output_dir, processor, doc_format, model):
     # Array to hold all the tasks to be completed including writing to files
     tasks = []
     n = len(input_img_paths)
-
     # count = 0  # THis is just to test out # TODO: remove in final pipeline
-    for i in range(n):
-        # if count == 1:
-        #     break
-        # count += 1
+    for i in range(n//2):
+        output_path = str(
+            output_dir
+            / model
+            / (input_img_paths[i].stem + f".{doc_format}")
+        )
+
+        # Append the tasks to be executed outside the for loop
+        tasks.append(processor(input_img_paths[i], input_txt_paths[i], output_path))
+    await asyncio.gather(*tasks)
+    await asyncio.sleep(60)
+    tasks = []
+    for i in range(n//2, n):
         output_path = str(
             output_dir
             / model
