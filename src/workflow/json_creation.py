@@ -329,63 +329,7 @@ def anthropic_img2json(path):
     )
     # Return JSON, with 2 spaces of indentation and default values excluded
     return entries.model_dump_json(indent=2, exclude_defaults=True)
-    # with open(os.path.join(project_root, "json", "anthropicimg2json_kbaa-p003.json"), "w") as file:
-    # file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
-
-# async def process_img2json_async(input_imgs, output_dir, processor, doc_format, model):
-#     # Array to hold all the tasks to be completed including writing to files
-#     tasks = []
-
-#     count = 0  # THis is just to test out # TODO: remove in final pipeline
-#     for input_path in input_imgs:
-#         if count == 1:
-#             break
-#         count += 1
-#         output_path = str(
-#             output_dir
-#             / model
-#             / (input_path.stem + f".{doc_format}")
-#         )
-
-#         # Append the tasks to be executed outside the for loop
-#         tasks.append(processor(input_path, output_path))
-#     await asyncio.gather(*tasks)
-
-
-# async def process_json_async(
-#     input_paths, output_dir, processor, doc_format, model
-# ):
-#     # Array to hold all the tasks to be completed including writing to files
-#     tasks = []
-#     n = len(input_paths)
-#     max_concurrency = 4
-#     semaphore = asyncio.Semaphore(max_concurrency)
-
-#     for i in range(n):
-#         output_path = str(
-#             output_dir
-#             / model
-#             / (input_paths[i].stem + ".json")
-#         )
-
-#         # Append the tasks to be executed outside the for loop
-#         tasks.append(processor(input_paths[i], output_path))
-#     await asyncio.gather(*tasks)
-
-#     # # Each task will temporarily stop for 1 minute if it 
-#     # await asyncio.sleep(60)
-
-#     # for i in range(n//2, n):
-#     #     output_path = str(
-#     #         output_dir
-#     #         / model
-#     #         / (input_paths[i].stem + ".json")
-#     #     )
-
-#     #     # Append the tasks to be executed outside the for loop
-#     #     tasks.append(processor(input_paths[i], output_path))
-#     # await asyncio.gather(*tasks)
 
 # Retry helper
 async def retry_with_backoff(fn, *args):
