@@ -12,20 +12,18 @@ import aiofiles
 import asyncio
 
 prompt_llm = """
-You are an expert historian. Your task is to transcribe the provided image into text. The image
-is a 20th century bibliographic entry. Because this is a historical document, try to preserve 
-archaic spelling or formatting where clearly intended. Put the dates associated with each entry at the end of the line.
-Return the text only, nothing else.
+Your task is to transcribe this image of a historical bibliography page as faithfully as possible.
+Only transcribe typed text that appears on the page and do not attempt to predict missing information or complete cut off entries. 
+Put each entry on a separate line. When an entry has an index number in square brackets, place it at the end of the entry. 
 """
 
 prompt_template_ocr_llm = """
 You are a text correction assistant. Your task is to clean up and correct errors from raw OCR output.
 The text may contain misrecognized characters, broken words, or incorrect formatting.
-Carefully read the provided OCR output and produce a corrected version that is grammatically accurate 
-and as faithful to the original content as possible. Because this is a historical document, try to 
-preserve archaic spelling or formatting where clearly intended. Only correct obvious OCR errors.
-Put the dates associated with each entry at the end of the line.
-
+Carefully read the provided OCR output, compare it to the original image, and produce a corrected version that is  
+as faithful to the original content as possible. Only correct obvious OCR errors, and do not attempt to complete
+cut-off entries or predict missing information. Put each entry on a separate line.
+When an entry has an index number in square brackets, place it at the end of the entry.
 Input (Raw OCR Text):
 {input}
 """
@@ -45,6 +43,7 @@ async def openai_img2txt_async(input_img_path, output_path):
     }
     response = await client.chat.completions.create(
         model="gpt-4o",
+        temperature= 0,
         messages=[
             {
                 "role": "user",
@@ -63,7 +62,6 @@ async def openai_img2txt_async(input_img_path, output_path):
         await f.write(response.choices[0].message.content)
 
 async def openai_img_txt2txt_async(input_img_path, input_txt_path, output_path):
-    print(input_txt_path)
     client = AsyncOpenAI()
     input = ""
     async with aiofiles.open(input_txt_path, "r") as f:
@@ -84,6 +82,7 @@ async def openai_img_txt2txt_async(input_img_path, input_txt_path, output_path):
     prompt_ocr_llm = prompt_template_ocr_llm.format(input=input).strip()
     response = await client.chat.completions.create(
         model="gpt-4o",
+        temperature= 0,
         messages=[
             {
                 "role": "user",
