@@ -368,13 +368,13 @@ def main():
     - Ground truth JSON files located at `project_root/ground-truth/json/gt_kbaa-pXYZ.json`
     - LLM/OCR transcribed JSON files located at:
         - for ground truth text to JSON via LLM:
-            - `project_root/results/gt-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+            - `project_root/results/json/gt-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
         - for OCR text to JSON via LLM:
-            - `project_root/results/ocr-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+            - `project_root/results/json/ocr-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
         - for image to JSON via LLM:
-            - `project_root/results/llm-img2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+            - `project_root/results/json/llm-img2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
         - for text to JSON via LLM:
-            - `project_root/results/llm-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+            - `project_root/results/json/llm-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
 
     The main function will:
     - Gather all ground truth JSON files
@@ -398,10 +398,10 @@ def main():
 
     # results/ paths
     all_models = get_all_models(
-        os.path.join(project_root, "results", "gt-txt2json"),
-        os.path.join(project_root, "results", "ocr-txt2json"),
-        os.path.join(project_root, "results", "llm-img2json"),
-        os.path.join(project_root, "results", "llm-txt2json")
+        os.path.join(project_root, "results", "json", "gt-txt2json"),
+        os.path.join(project_root, "results", "json", "ocr-txt2json"),
+        os.path.join(project_root, "results", "json", "llm-img2json"),
+        os.path.join(project_root, "results", "json", "llm-txt2json")
     )
     logger.info(f"Models found: {all_models}")
 
@@ -434,7 +434,7 @@ def main():
     for model_type, model in all_models:
         logger.info("Collecting results for model: %s/%s", model_type, model)
 
-        model_path = os.path.join(project_root, "results", model_type, model)
+        model_path = os.path.join(project_root, "results", "json", model_type, model)
         results_json[model], _ = get_docs(
             model_path, doc_names, "json", name_has_prefix=True
         )
