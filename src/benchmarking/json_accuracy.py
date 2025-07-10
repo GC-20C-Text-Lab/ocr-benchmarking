@@ -129,20 +129,20 @@ def ascii_only_punct_removed_lower(x):
 
 # ----------------- Helper Functions -----------------
 
-def load_json_safely(path):
-    """Load JSON into a DataFrame, or return None if missing/error."""
-    if not os.path.isfile(path):
-        logger.warning(f"Could not load JSON at {path}: not a file")
-        return None
-    try:
-        with open(path, 'r') as file:
-            file_json = json.loads(file.read())
-            entries = file_json['entries']
-            df = pd.DataFrame(entries)
-            return df
-    except Exception as e:
-        logger.warning(f"Could not load JSON at {path}: {e}")
-        return None
+# def load_json_safely(path):
+#     """Load JSON into a DataFrame, or return None if missing/error."""
+#     if not os.path.isfile(path):
+#         logger.warning(f"Could not load JSON at {path}: not a file")
+#         return None
+#     try:
+#         with open(path, 'r') as file:
+#             file_json = json.loads(file.read())
+#             entries = file_json['entries']
+#             df = pd.DataFrame(entries)
+#             return df
+#     except Exception as e:
+#         logger.warning(f"Could not load JSON at {path}: {e}")
+#         return None
 
 
 def filter_expected_columns(df):
@@ -171,10 +171,11 @@ def compare_dataframes(gt_df, pred_df, method, options={}):
     # Check if any dataframe is empty
     if gt_df is None or pred_df is None:
         return {
-            "matches": 0,
-            "total": 0,
+            "matches": np.nan,
+            "total": np.nan,
             "mismatch_bool": True,
-            "pred_nrows": 0
+            "pred_nrows": 0,
+            "gt_nrows": 0,
         }
 
     # Check for row mismatch
@@ -183,10 +184,11 @@ def compare_dataframes(gt_df, pred_df, method, options={}):
 
     if gt_rows != pred_rows:
         return {
-            "matches": 0,
-            "total": 0,
+            "matches": np.nan,
+            "total": np.nan,
             "mismatch_bool": True,
-            "pred_nrows": pred_rows
+            "pred_nrows": pred_rows,
+            "gt_nrows": gt_rows,
         }
     
     if method == 'exact':
@@ -196,7 +198,8 @@ def compare_dataframes(gt_df, pred_df, method, options={}):
             "matches": matches,
             "total": total,
             "mismatch_bool": False,
-            "pred_nrows": pred_rows
+            "pred_nrows": pred_rows,
+            "gt_nrows": gt_rows,
         }
     
     elif method == "normalized":
@@ -221,7 +224,8 @@ def compare_dataframes(gt_df, pred_df, method, options={}):
             "matches": match_count,
             "total": total_cells,
             "mismatch_bool": False,
-            "pred_nrows": pred_rows
+            "pred_nrows": pred_rows,
+            "gt_nrows": gt_rows,
         }
     
     elif method == "fuzzy":
@@ -244,7 +248,8 @@ def compare_dataframes(gt_df, pred_df, method, options={}):
             "matches": match_count,
             "total": total_cells,
             "mismatch_bool": False,
-            "pred_nrows": pred_rows
+            "pred_nrows": pred_rows,
+            "gt_nrows": gt_rows,
         }
     
     else:
@@ -285,11 +290,21 @@ def build_dataframe(title, doc_names, results_data):
     Build a Pandas dataframe for a given results_data and doc_lengths structure.
     - results_data[model][doc] => (matches, total, mismatch_bool, pred_nrows)
 
-    The dataframe has one row for each document and metric, for example:
-    - doc1:matches, doc1:total, doc1:matches_pct, doc1:mismatch_bool, doc1:pred_nrows, ...
+    The dataframe has one row for each document and metric:
+    - `docN:matches`: Number of matching cells in document if row counts match, otherwise NaN
+    - `docN:total`: Total matching cells in document if row counts match, otherwise NaN
+    - `docN:matches_pct`: Percent of matching cells if row counts match, otherwise NaN
+    - `docN:mismatch_bool`: True if number of rows between ground truth and predicted data matches. 
+    - `docN:pred_nrows`: Number of rows in the predicted data.
+    - `docN:gt_nrows`: Number of rows in the ground truth data.
 
     The dataframe also has rows for aggregate metrics, namely:
-    - __ALL__:matches, __ALL__:total, __ALL__:matches_pct, __ALL__:mismatches_count, __ALL__:pred_nrows
+    - `__ALL__:matches`: Number of matching cells among pages with matching row counts
+    - `__ALL__:total`: Total number of cells among pages with matching row counts
+    - `__ALL__:matches_pct`: `__ALL__:matches` divided by `__ALL__:total`, or 0 if `__ALL__:total` is 0.
+    - `__ALL__:mismatched_dim_count`: Number of pages with mismatched row counts.
+    - `__ALL__:pred_nrows`: Total number of rows in the prediction.
+    - `__ALL__:gt_nrows`: Total number of rows in the ground truth.
 
     The dataframe has one column for each model used, like pytesseract.
 
@@ -310,27 +325,36 @@ def build_dataframe(title, doc_names, results_data):
         model_sum_total = 0
         model_sum_mismatches = 0
         model_sum_pred_nrows = 0
+        model_sum_gt_nrows = 0
 
         for doc in doc_names:
             cell_data = results_data[model].get(doc, None)
             if cell_data is not None:
                 df.at[f"{doc}:matches", model] = cell_data["matches"]
                 df.at[f"{doc}:total", model] = cell_data["total"]
-                df.at[f"{doc}:matches_pct", model] = (cell_data["matches"] / cell_data["total"]) * 100
+                df.at[f"{doc}:matches_pct", model] = (
+                    (cell_data["matches"] / cell_data["total"]) * 100
+                        if (not cell_data["mismatch_bool"]) or cell_data["total"] > 0
+                        else np.nan
+                            if cell_data["mismatch_bool"]
+                            else 0
+                )
                 df.at[f"{doc}:mismatch_bool", model] = cell_data["mismatch_bool"]
                 df.at[f"{doc}:pred_nrows", model] = cell_data["pred_nrows"]
+                df.at[f"{doc}:gt_nrows", model] = cell_data["gt_nrows"]
 
-                model_sum_matches += cell_data["matches"]
-                model_sum_total += cell_data["total"]
-                if cell_data["mismatch_bool"]:
-                    model_sum_mismatches += 1
+                model_sum_matches += cell_data["matches"] if not pd.isna(cell_data["matches"]) else 0
+                model_sum_total += cell_data["total"] if not pd.isna(cell_data["total"]) else 0
+                model_sum_mismatches += 1 if cell_data["mismatch_bool"] else 0
                 model_sum_pred_nrows += cell_data["pred_nrows"]
+                model_sum_gt_nrows += cell_data["gt_nrows"]
         
         df.at["__ALL__:matches", model] = model_sum_matches
         df.at["__ALL__:total", model] = model_sum_total
-        df.at["__ALL__:matches_pct", model] = (model_sum_matches / model_sum_total) * 100
-        df.at["__ALL__:mismatches_count", model] = model_sum_mismatches
+        df.at["__ALL__:matches_pct", model] = (model_sum_matches / model_sum_total) * 100 if model_sum_total > 0 else 0
+        df.at["__ALL__:mismatched_dim_count", model] = model_sum_mismatches
         df.at["__ALL__:pred_nrows", model] = model_sum_pred_nrows
+        df.at["__ALL__:gt_nrows", model] = model_sum_gt_nrows
 
     return df
 
