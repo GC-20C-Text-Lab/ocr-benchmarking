@@ -88,9 +88,9 @@ def normalize_cell_value(x):
     """
     if isinstance(x, str):
         x_str = str(x).strip().lower()
-        if x_str in ("", "null"):
-            return None
         return x_str
+    else:
+        return x
 
 
 def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -130,20 +130,20 @@ def ascii_only_punct_removed_lower(x):
 
 # ----------------- Helper Functions -----------------
 
-# def load_json_safely(path):
-#     """Load JSON into a DataFrame, or return None if missing/error."""
-#     if not os.path.isfile(path):
-#         logger.warning(f"Could not load JSON at {path}: not a file")
-#         return None
-#     try:
-#         with open(path, 'r') as file:
-#             file_json = json.loads(file.read())
-#             entries = file_json['entries']
-#             df = pd.DataFrame(entries)
-#             return df
-#     except Exception as e:
-#         logger.warning(f"Could not load JSON at {path}: {e}")
-#         return None
+def load_json_safely(path):
+    """Load JSON into a DataFrame, or return None if missing/error."""
+    if not os.path.isfile(path):
+        logger.warning(f"Could not load JSON at {path}: not a file")
+        return None
+    try:
+        with open(path, 'r') as file:
+            file_json = json.loads(file.read())
+            entries = file_json['entries']
+            df = pd.DataFrame(entries)
+            return df
+    except Exception as e:
+        logger.warning(f"Could not load JSON at {path}: {e}")
+        return None
 
 
 def filter_expected_columns(df):
@@ -158,7 +158,7 @@ def filter_expected_columns(df):
     # Check if all expected columns exist
     for col in EXPECTED_COLUMNS:
         if col not in df.columns:
-            df[col] = np.nan
+            df[col] = pd.NA
     # Reindex to EXACTLY those columns => remove extras
     df = df.reindex(columns=EXPECTED_COLUMNS)
     # Normalize all cells (for EXACT matching)
@@ -180,7 +180,7 @@ def make_match_dataframe(
 
     gt_df and pred_df must have the same dimensions.
     """
-    match_df = pd.DataFrame().reindex_like(gt_df)
+    match_df = pd.DataFrame().reindex_like(gt_df).astype(bool)
 
     nrows = gt_df.shape[0]
     ncols = len(EXPECTED_COLUMNS)
@@ -221,7 +221,7 @@ def fuzzy_cell_matcher(gt_cell, pred_cell, options):
         return gt_cell == pred_cell
 
 
-def compare_dataframes(gt_df, pred_df, method, options={"threshold": FUZZY_THRESHOLD}):
+def compare_dataframes(gt_df: pd.DataFrame, pred_df: pd.DataFrame, method: str, options={"threshold": FUZZY_THRESHOLD}):
     # Check if any dataframe is empty
     if gt_df is None or pred_df is None:
         return {
@@ -229,21 +229,39 @@ def compare_dataframes(gt_df, pred_df, method, options={"threshold": FUZZY_THRES
             "total": np.nan,
             "mismatch_bool": True,
             "pred_nrows": 0,
+            "pred_adj_nrows": 0,
             "gt_nrows": 0,
         }
+    
+    # Copy dataframes since we are potentially modifying them
+    gt_df_temp = gt_df.copy()
+    pred_df_temp = pred_df.copy()
 
     # Check for row mismatch
-    gt_rows = gt_df.shape[0]
-    pred_rows = pred_df.shape[0]
+    gt_rows = gt_df_temp.shape[0]
+    pred_rows = pred_df_temp.shape[0]
 
-    if gt_rows != pred_rows:
+    # If gt_row is one more than pred_rows, add empty row to beginning of pred_df due to observation
+    # of missing empty rows.
+    #
+    # For other row number mismatches, skip comparison and return a mismatch.
+    if gt_rows == pred_rows + 1:
+        pred_df_temp.loc[-1] = np.nan
+        pred_df_temp = pred_df_temp.fillna(EXPECTED_COLUMNS_DEFAULTS)
+        pred_df_temp.index = pred_df_temp.index + 1
+        pred_df_temp.sort_index(inplace=True)
+    elif gt_rows != pred_rows:
         return {
             "matches": np.nan,
             "total": np.nan,
             "mismatch_bool": True,
             "pred_nrows": pred_rows,
+            "pred_adj_nrows": pred_rows,
             "gt_nrows": gt_rows,
         }
+    
+    # Determine adjusted row count
+    pred_adj_rows = pred_df_temp.shape[0]
 
     # Select matching method
     matcher = {
@@ -253,7 +271,7 @@ def compare_dataframes(gt_df, pred_df, method, options={"threshold": FUZZY_THRES
     }.get(method, "exact")
 
     # Create dataframe for matches and results dict
-    match_df = make_match_dataframe(gt_df, pred_df, matcher, options)
+    match_df = make_match_dataframe(gt_df_temp, pred_df_temp, matcher, options)
     results = {}
 
     # Count number of True values in each column and add to returned results
@@ -267,6 +285,7 @@ def compare_dataframes(gt_df, pred_df, method, options={"threshold": FUZZY_THRES
     results["total"] = gt_rows * len(EXPECTED_COLUMNS)
     results["mismatch_bool"] = False
     results["pred_nrows"] = pred_rows
+    results["pred_adj_nrows"] = pred_adj_rows
     results["gt_nrows"] = gt_rows
 
     return results
@@ -430,6 +449,7 @@ def build_dataframe(title, doc_names, results_data):
         model_sum_total = 0
         model_sum_mismatches = 0
         model_sum_pred_nrows = 0
+        model_sum_pred_adj_nrows = 0
         model_sum_gt_nrows = 0
         model_sum_counted_nrows = 0
         model_col_results = {}
@@ -456,6 +476,7 @@ def build_dataframe(title, doc_names, results_data):
                 model_sum_total += cell_data["total"] if not pd.isna(cell_data["total"]) else 0
                 model_sum_mismatches += 1 if cell_data["mismatch_bool"] else 0
                 model_sum_pred_nrows += cell_data["pred_nrows"]
+                model_sum_pred_adj_nrows += cell_data["pred_adj_nrows"]
                 model_sum_gt_nrows += cell_data["gt_nrows"]
                 model_sum_counted_nrows += cell_data["gt_nrows"] if not cell_data["mismatch_bool"] else 0
         
@@ -466,6 +487,7 @@ def build_dataframe(title, doc_names, results_data):
         df.at["__ALL__:matches_pct", model] = (model_sum_matches / model_sum_total) * 100 if model_sum_total > 0 else 0
         df.at["__ALL__:mismatched_dim_count", model] = model_sum_mismatches
         df.at["__ALL__:pred_nrows", model] = model_sum_pred_nrows
+        df.at["__ALL__:pred_adj_nrows", model] = model_sum_pred_adj_nrows
         df.at["__ALL__:gt_nrows", model] = model_sum_gt_nrows
         df.at["__ALL__:counted_nrows", model] = model_sum_counted_nrows
 
