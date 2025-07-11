@@ -1,3 +1,4 @@
+import random
 from pydantic import BaseModel, Field
 import instructor
 from typing import List
@@ -328,47 +329,40 @@ def anthropic_img2json(path):
     )
     # Return JSON, with 2 spaces of indentation and default values excluded
     return entries.model_dump_json(indent=2, exclude_defaults=True)
-    # with open(os.path.join(project_root, "json", "anthropicimg2json_kbaa-p003.json"), "w") as file:
-    # file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
 
-# async def process_img2json_async(input_imgs, output_dir, processor, doc_format, model):
-#     # Array to hold all the tasks to be completed including writing to files
-#     tasks = []
-
-#     count = 0  # THis is just to test out # TODO: remove in final pipeline
-#     for input_path in input_imgs:
-#         if count == 1:
-#             break
-#         count += 1
-#         output_path = str(
-#             output_dir
-#             / model
-#             / (input_path.stem + f".{doc_format}")
-#         )
-
-#         # Append the tasks to be executed outside the for loop
-#         tasks.append(processor(input_path, output_path))
-#     await asyncio.gather(*tasks)
+async def retry_with_backoff(fn, *args):
+    retries, base_delay = 5, 2
+    for attempt in range(retries):
+        try:
+            return await fn(*args)
+        except Exception as e:
+            if attempt < retries - 1:
+                delay = base_delay * (2**attempt) + random.uniform(0, 1)
+                print(f"Retrying in {delay:.2f}s after error: {e}")
+                await asyncio.sleep(delay)
+            else:
+                print(f"Failed after {retries} attempts: {e}")
+                raise
 
 
-async def process_json_async(
-    input_paths, output_dir, processor, doc_format, model
-):
+# Semaphore + retry wrapper
+async def limited_processor(semaphore, processor, *args):
+    async with semaphore:
+        return await retry_with_backoff(processor, *args)
+
+
+async def process_json_async(input_paths, output_dir, processor, model):
     # Array to hold all the tasks to be completed including writing to files
     tasks = []
+    n = len(input_paths)
+    max_concurrency = 4
+    semaphore = asyncio.Semaphore(max_concurrency)
 
-    # count = 0  # THis is just to test out # TODO: remove in final pipeline
-    for input_path in input_paths:
-        # if count == 1:
-        #     break
-        # count += 1
-        output_path = str(
-            output_dir
-            / model
-            / (input_path.stem + f".{doc_format}")
-        )
+    for i in range(n):
+        output_path = str(output_dir / model / (input_paths[i].stem + ".json"))
 
         # Append the tasks to be executed outside the for loop
-        tasks.append(processor(input_path, output_path))
+        task = limited_processor(semaphore, processor, input_paths[i], output_path)
+        tasks.append(task)
     await asyncio.gather(*tasks)

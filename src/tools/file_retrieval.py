@@ -71,7 +71,6 @@ def get_all_models(type, *argv):
     all_models = []
     for arg in argv:
         if os.path.isdir(arg):
-            print(arg)
             for model in os.listdir(arg):
                 all_models.append((os.path.basename(arg), model))
     # sort by model name

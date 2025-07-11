@@ -1,4 +1,6 @@
 import base64
+import random
+import PIL
 from pydantic import BaseModel, Field
 import instructor
 from typing import List
@@ -28,22 +30,34 @@ Input (Raw OCR Text):
 {input}
 """
 
+
+async def encode_image_to_base64(image_path):
+    async with aiofiles.open(image_path, "rb") as f:
+        img_bytes = await f.read()
+    base64_img = base64.b64encode(img_bytes).decode("utf-8")
+    # Create image content in correct format
+    image_content = {
+        "type": "image_url",
+        "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"},
+    }
+
+
 async def openai_img2txt_async(input_img_path, output_path):
     client = AsyncOpenAI()
     # Read and base64-encode image
     async with aiofiles.open(input_img_path, "rb") as f:
         img_bytes = await f.read()
     base64_img = base64.b64encode(img_bytes).decode("utf-8")
+
     # Create image content in correct format
     image_content = {
         "type": "image_url",
-        "image_url": {
-            "url": f"data:image/jpeg;base64,{base64_img}"
-        },
+        "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"},
     }
+
     response = await client.chat.completions.create(
         model="gpt-4o",
-        temperature= 0,
+        temperature=0,
         messages=[
             {
                 "role": "user",
@@ -61,8 +75,32 @@ async def openai_img2txt_async(input_img_path, output_path):
     async with aiofiles.open(output_path, "w") as f:
         await f.write(response.choices[0].message.content)
 
+
+async def gemini_img2txt_async(input_img_path, output_path):
+    client = Client()
+    img = PIL.Image.open(input_img_path)
+    response = await client.aio.models.generate_content(
+        model="gemini-2.5-flash", contents=[prompt_llm, img]
+    )
+    async with aiofiles.open(output_path, "w") as f:
+        await f.write(response.text)
+
+
+async def gemini_img_txt2txt_async(input_img_path, input_txt_path, output_path):
+    client = Client()
+    input = ""
+    async with aiofiles.open(input_txt_path, "r") as f:
+        input = await f.read()
+    prompt_ocr_llm = prompt_template_ocr_llm.format(input=input).strip()
+    img = PIL.Image.open(input_img_path)
+    response = await client.aio.models.generate_content(
+        model="gemini-2.5-flash", contents=[prompt_ocr_llm, img]
+    )
+    async with aiofiles.open(output_path, "w") as f:
+        await f.write(response.text)
+
+
 async def openai_img_txt2txt_async(input_img_path, input_txt_path, output_path):
-    print(input_txt_path)
     client = AsyncOpenAI()
     input = ""
     async with aiofiles.open(input_txt_path, "r") as f:
@@ -76,14 +114,12 @@ async def openai_img_txt2txt_async(input_img_path, input_txt_path, output_path):
     # Create image content in correct format
     image_content = {
         "type": "image_url",
-        "image_url": {
-            "url": f"data:image/jpeg;base64,{base64_img}"
-        },
+        "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"},
     }
     prompt_ocr_llm = prompt_template_ocr_llm.format(input=input).strip()
     response = await client.chat.completions.create(
         model="gpt-4o",
-        temperature= 0,
+        temperature=0,
         messages=[
             {
                 "role": "user",
@@ -101,42 +137,57 @@ async def openai_img_txt2txt_async(input_img_path, input_txt_path, output_path):
     async with aiofiles.open(output_path, "w") as f:
         await f.write(response.choices[0].message.content)
 
-async def process_single_async(input_img_paths, output_dir, processor, doc_format, model):
-    # Array to hold all the tasks to be completed including writing to files
-    tasks = []
 
-    # count = 0  # THis is just to test out # TODO: remove in final pipeline
-    for input_path in input_img_paths:
-        # if count == 1:
-        #     break
-        # count += 1
-        output_path = str(
-            output_dir
-            / model
-            / (input_path.stem + f".{doc_format}")
-        )
+async def retry_with_backoff(fn, *args):
+    retries, base_delay = 5, 2
 
-        # Append the tasks to be executed outside the for loop
-        tasks.append(processor(input_path, output_path))
-    await asyncio.gather(*tasks)
+    for attempt in range(retries):
+        try:
+            return await fn(*args)
+        except Exception as e:
+            if attempt < retries - 1:
+                delay = base_delay * (2**attempt) + random.uniform(0, 1)
+                print(f"Retrying in {delay:.2f}s after error: {e}")
+                await asyncio.sleep(delay)
+            else:
+                print(f"Failed after {retries} attempts: {e}")
+                raise
 
 
-async def process_double_async(input_img_paths, input_txt_paths, output_dir, processor, doc_format, model):
+async def limited_processor(semaphore, processor, *args):
+    async with semaphore:
+        return await retry_with_backoff(processor, *args)
+
+
+async def process_single_async(input_img_paths, output_dir, processor, model):
     # Array to hold all the tasks to be completed including writing to files
     tasks = []
     n = len(input_img_paths)
+    max_concurrency = 4
+    semaphore = asyncio.Semaphore(max_concurrency)
 
-    # count = 0  # THis is just to test out # TODO: remove in final pipeline
     for i in range(n):
-        # if count == 1:
-        #     break
-        # count += 1
-        output_path = str(
-            output_dir
-            / model
-            / (input_img_paths[i].stem + f".{doc_format}")
-        )
+        output_path = str(output_dir / model / (input_img_paths[i].stem + ".txt"))
 
         # Append the tasks to be executed outside the for loop
-        tasks.append(processor(input_img_paths[i], input_txt_paths[i], output_path))
+        task = limited_processor(semaphore, processor, input_img_paths[i], output_path)
+        tasks.append(task)
+    await asyncio.gather(*tasks)
+
+
+async def process_double_async(
+    input_img_paths, input_txt_paths, output_dir, processor, model
+):
+    n = len(input_img_paths)
+    max_concurrency = 4  # Safe limit for Tier 1
+    semaphore = asyncio.Semaphore(max_concurrency)
+    tasks = []
+
+    for i in range(n):
+        output_path = str(output_dir / model / (input_img_paths[i].stem + ".txt"))
+        task = limited_processor(
+            semaphore, processor, input_img_paths[i], input_txt_paths[i], output_path
+        )
+        tasks.append(task)
+
     await asyncio.gather(*tasks)
