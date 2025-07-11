@@ -1,4 +1,5 @@
 import base64
+import os
 import random
 import PIL
 from pydantic import BaseModel, Field
@@ -131,6 +132,42 @@ async def openai_img_txt2txt_async(input_img_path, input_txt_path, output_path):
                     },
                 ],
             }
+        ],
+    )
+    # Async file write
+    async with aiofiles.open(output_path, "w") as f:
+        await f.write(response.choices[0].message.content)
+
+
+async def qwen_img2txt_async(input_img_path, output_path):
+    client = AsyncOpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+    )
+    # Read and base64-encode image
+    async with aiofiles.open(input_img_path, "rb") as f:
+        img_bytes = await f.read()
+    base64_img = base64.b64encode(img_bytes).decode("utf-8")
+
+    # Create image content in correct format
+    image_content = {
+        "type": "image_url",
+        "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"},
+    }
+    response = await client.chat.completions.create(
+        model="qwen/qwen2.5-vl-72b-instruct",
+        temperature=0,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    image_content,
+                    {
+                        "type": "text",
+                        "text": prompt_llm,
+                    },
+                ],
+            },
         ],
     )
     # Async file write
