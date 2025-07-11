@@ -86,6 +86,20 @@ async def gemini_img2txt_async(input_img_path, output_path):
         await f.write(response.text)
 
 
+async def gemini_img_txt2txt_async(input_img_path, input_txt_path, output_path):
+    client = Client()
+    input = ""
+    async with aiofiles.open(input_txt_path, "r") as f:
+        input = await f.read()
+    prompt_ocr_llm = prompt_template_ocr_llm.format(input=input).strip()
+    img = PIL.Image.open(input_img_path)
+    response = await client.aio.models.generate_content(
+        model="gemini-2.5-flash", contents=[prompt_ocr_llm, img]
+    )
+    async with aiofiles.open(output_path, "w") as f:
+        await f.write(response.text)
+
+
 async def openai_img_txt2txt_async(input_img_path, input_txt_path, output_path):
     client = AsyncOpenAI()
     input = ""
