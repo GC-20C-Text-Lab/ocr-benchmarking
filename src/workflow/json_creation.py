@@ -331,7 +331,6 @@ def anthropic_img2json(path):
     return entries.model_dump_json(indent=2, exclude_defaults=True)
 
 
-# Retry helper
 async def retry_with_backoff(fn, *args):
     retries, base_delay = 5, 2
     for attempt in range(retries):
@@ -339,21 +338,21 @@ async def retry_with_backoff(fn, *args):
             return await fn(*args)
         except Exception as e:
             if attempt < retries - 1:
-                delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                delay = base_delay * (2**attempt) + random.uniform(0, 1)
                 print(f"Retrying in {delay:.2f}s after error: {e}")
                 await asyncio.sleep(delay)
             else:
                 print(f"Failed after {retries} attempts: {e}")
                 raise
 
+
 # Semaphore + retry wrapper
 async def limited_processor(semaphore, processor, *args):
     async with semaphore:
         return await retry_with_backoff(processor, *args)
 
-async def process_json_async(
-    input_paths, output_dir, processor, model
-):
+
+async def process_json_async(input_paths, output_dir, processor, model):
     # Array to hold all the tasks to be completed including writing to files
     tasks = []
     n = len(input_paths)
@@ -361,11 +360,7 @@ async def process_json_async(
     semaphore = asyncio.Semaphore(max_concurrency)
 
     for i in range(n):
-        output_path = str(
-            output_dir
-            / model
-            / (input_paths[i].stem + ".json")
-        )
+        output_path = str(output_dir / model / (input_paths[i].stem + ".json"))
 
         # Append the tasks to be executed outside the for loop
         task = limited_processor(semaphore, processor, input_paths[i], output_path)
