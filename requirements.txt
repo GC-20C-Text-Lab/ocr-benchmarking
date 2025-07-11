@@ -10,3 +10,4 @@ pillow==11.2.1
 instructor==1.9.0
 pydantic==2.11.7
 json-ref==1.1.0
+aiofiles==24.1.0

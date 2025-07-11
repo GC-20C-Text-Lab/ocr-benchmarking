@@ -71,7 +71,6 @@ def get_all_models(type, *argv):
     all_models = []
     for arg in argv:
         if os.path.isdir(arg):
-            print(arg)
             for model in os.listdir(arg):
                 all_models.append((os.path.basename(arg), model))
     # sort by model name
@@ -115,6 +114,15 @@ def get_docs(dir, doc_names, doc_format, name_has_prefix=False):
             all_docs["entries"] += data["entries"]
 
     return docs, all_docs
+
+
+def get_paths(dir, doc_format, name_has_prefix=False):
+    # Add all filenames in images directory into the `filenames` array with the ENTIRE filepath
+    filepaths = []
+    for path in dir.iterdir():
+        if path.suffix.lower() == f".{doc_format}" and path.is_file():
+            filepaths.append(path)
+    return filepaths
 
 
 """
