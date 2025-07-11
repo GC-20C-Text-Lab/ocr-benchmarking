@@ -247,9 +247,7 @@ async def gemini_txt2json_async(input_path, output_path):
 # Takes as input the path to an image and returns formatted JSON following the Entries schema
 def gemini_img2json(path):
     # Create the Google GenAI client
-    client = instructor.from_genai(
-        AsyncClient(), instructor.Mode.GENAI_STRUCTURED_OUTPUTS
-    )
+    client = instructor.from_genai(Client(), instructor.Mode.GENAI_STRUCTURED_OUTPUTS)
     # Call the API
     entries = client.chat.completions.create(
         model="gemini-2.5-flash",
