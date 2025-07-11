@@ -1,4 +1,5 @@
 import random
+import PIL
 from pydantic import BaseModel, Field
 import instructor
 from typing import List
@@ -247,9 +248,7 @@ async def gemini_txt2json_async(input_path, output_path):
 # Takes as input the path to an image and returns formatted JSON following the Entries schema
 def gemini_img2json(path):
     # Create the Google GenAI client
-    client = instructor.from_genai(
-        AsyncClient(), instructor.Mode.GENAI_STRUCTURED_OUTPUTS
-    )
+    client = instructor.from_genai(Client(), instructor.Mode.GENAI_STRUCTURED_OUTPUTS)
     # Call the API
     entries = client.chat.completions.create(
         model="gemini-2.5-flash",
@@ -268,6 +267,34 @@ def gemini_img2json(path):
     return entries.model_dump_json(indent=2, exclude_defaults=True)
     # with open(path, "w") as file:
     # file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+
+
+async def gemini_img2json_async(input_img_path, output_path):
+    # client = instructor.from_genai(Client(), instructor.Mode.GENAI_STRUCTURED_OUTPUTS)
+    # img = PIL.Image.open(input_img_path)
+    # entries = client.aio.models.generate_content(
+    #     model="gemini-2.5-flash",
+    # )
+    async_client = instructor.from_provider(
+        "google/gemini-2.5-flash", async_client=True
+    )
+    response = await async_client.chat.completions.create(
+        response_model=Entries,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    instructor.Image.from_path(input_img_path),
+                    "Using this scanned image of the page, convert each entry in this bibliography into structured JSON.\n",
+                ],
+            }
+        ],
+    )
+
+    json_result = response.model_dump_json(indent=2, exclude_defaults=True)
+    # Async file write
+    async with aiofiles.open(output_path, "w") as f:
+        await f.write(json_result)
 
 
 # Takes as input the path to a text file and returns formatted JSON following the Entries schema
@@ -359,7 +386,7 @@ async def process_json_async(input_paths, output_dir, processor, model):
     max_concurrency = 4
     semaphore = asyncio.Semaphore(max_concurrency)
 
-    for i in range(n):
+    for i in range(2):
         output_path = str(output_dir / model / (input_paths[i].stem + ".json"))
 
         # Append the tasks to be executed outside the for loop
