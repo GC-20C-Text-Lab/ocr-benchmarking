@@ -382,7 +382,7 @@ async def process_json_async(input_paths, output_dir, processor, model):
     max_concurrency = 4
     semaphore = asyncio.Semaphore(max_concurrency)
 
-    for i in range(2):
+    for i in range(n):
         output_path = str(output_dir / model / (input_paths[i].stem + ".json"))
 
         # Append the tasks to be executed outside the for loop
