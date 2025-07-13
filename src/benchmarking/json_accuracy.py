@@ -221,16 +221,32 @@ def fuzzy_cell_matcher(gt_cell, pred_cell, options):
         return gt_cell == pred_cell
 
 
-def compare_dataframes(gt_df: pd.DataFrame, pred_df: pd.DataFrame, method: str, options={"threshold": FUZZY_THRESHOLD}):
+def compare_dataframes_core(gt_df: pd.DataFrame, pred_df: pd.DataFrame, method: str, options={"threshold": FUZZY_THRESHOLD}):
+    """
+    Compares the two dataframes, gt_df and pred_df, using the method parameter (exact, normalized, fuzzy).
+    If gt_df has one more row than pred_df, then add one empty row to the top of pred_df to normalize dimensions.
+    
+    Returns a dictionary containing the keys and corresponding values:
+    - gt_df_adj: A copy of the ground truth dataframe after dimensional adjustments
+    - pred_df_adj: A copy of the predicted dataframe after dimensional adjustments
+    - match_df: A boolean dataframe where a cell is true if and only if the corresponding cell in gt_df_adj and pred_df_adj match.
+    - results: A dictionary with selected results
+    """
     # Check if any dataframe is empty
     if gt_df is None or pred_df is None:
-        return {
+        results = {
             "matches": np.nan,
             "total": np.nan,
             "mismatch_bool": True,
             "pred_nrows": 0,
             "pred_adj_nrows": 0,
             "gt_nrows": 0,
+        }
+        return {
+            "gt_df_adj": None,
+            "pred_df_adj": None,
+            "match_df": None,
+            "results": results
         }
     
     # Copy dataframes since we are potentially modifying them
@@ -251,7 +267,7 @@ def compare_dataframes(gt_df: pd.DataFrame, pred_df: pd.DataFrame, method: str, 
         pred_df_temp.index = pred_df_temp.index + 1
         pred_df_temp.sort_index(inplace=True)
     elif gt_rows != pred_rows:
-        return {
+        results = {
             "matches": np.nan,
             "total": np.nan,
             "mismatch_bool": True,
@@ -259,6 +275,13 @@ def compare_dataframes(gt_df: pd.DataFrame, pred_df: pd.DataFrame, method: str, 
             "pred_adj_nrows": pred_rows,
             "gt_nrows": gt_rows,
         }
+        return {
+            "gt_df_adj": gt_df_temp,
+            "pred_df_adj": pred_df_temp,
+            "match_df": None,
+            "results": results
+        }
+        
     
     # Determine adjusted row count
     pred_adj_rows = pred_df_temp.shape[0]
@@ -288,7 +311,23 @@ def compare_dataframes(gt_df: pd.DataFrame, pred_df: pd.DataFrame, method: str, 
     results["pred_adj_nrows"] = pred_adj_rows
     results["gt_nrows"] = gt_rows
 
-    return results
+    return {
+        "gt_df_adj": gt_df_temp,
+        "pred_df_adj": pred_df_temp,
+        "match_df": match_df,
+        "results": results
+    }
+
+
+def compare_dataframes(gt_df: pd.DataFrame, pred_df: pd.DataFrame, method: str, options={"threshold": FUZZY_THRESHOLD}):
+    """
+    Compares the two dataframes, gt_df and pred_df, using the method parameter (exact, normalized, fuzzy).
+    If gt_df has one more row than pred_df, then add one empty row to the top of pred_df to match dimensions.
+    Otherwise, no comparison is made and "mismatch_bool" in the returned dictionary is True.
+    """
+
+    compare_output = compare_dataframes_core(gt_df, pred_df, method, options)
+    return compare_output["results"]
 
 
 # def compare_dataframes_old_method(gt_df, pred_df, method, options={}):
@@ -419,7 +458,7 @@ def build_dataframe(title, doc_names, results_data):
     - `docN:matches`: Number of matching cells in document if row counts match, otherwise NaN
     - `docN:total`: Total matching cells in document if row counts match, otherwise NaN
     - `docN:matches_pct`: Percent of matching cells if row counts match, otherwise NaN
-    - `docN:mismatch_bool`: True if number of rows between ground truth and predicted data matches. 
+    - `docN:mismatch_bool`: True if number of rows between ground truth and predicted data matches or could be adjusted to match.
     - `docN:pred_nrows`: Number of rows in the predicted data.
     - `docN:gt_nrows`: Number of rows in the ground truth data.
 
