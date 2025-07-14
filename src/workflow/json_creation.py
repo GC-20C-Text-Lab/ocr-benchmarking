@@ -1,4 +1,5 @@
 import random
+import PIL
 from pydantic import BaseModel, Field
 import instructor
 from typing import List
@@ -222,12 +223,13 @@ def gemini_txt2json(path):
 
 
 async def gemini_txt2json_async(input_path, output_path):
-    client = from_genai(Client(), mode=Mode.GENAI_STRUCTURED_OUTPUTS)
+    async_client = instructor.from_provider(
+        "google/gemini-2.5-flash", async_client=True
+    )
     async with aiofiles.open(input_path, "r") as f:
         text = await f.read()
 
-    entries = await client.chat.completions.create(
-        model="gemini-2.5-flash",
+    response = await async_client.chat.completions.create(
         response_model=Entries,
         messages=[
             {
@@ -238,7 +240,7 @@ async def gemini_txt2json_async(input_path, output_path):
         ],
     )
 
-    json_result = entries.model_dump_json(indent=2, exclude_defaults=True)
+    json_result = response.model_dump_json(indent=2, exclude_defaults=True)
     # Async file write
     async with aiofiles.open(output_path, "w") as f:
         await f.write(json_result)
@@ -266,6 +268,29 @@ def gemini_img2json(path):
     return entries.model_dump_json(indent=2, exclude_defaults=True)
     # with open(path, "w") as file:
     # file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+
+
+async def gemini_img2json_async(input_img_path, output_path):
+    async_client = instructor.from_provider(
+        "google/gemini-2.5-flash", async_client=True
+    )
+    response = await async_client.chat.completions.create(
+        response_model=Entries,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    instructor.Image.from_path(input_img_path),
+                    "Using this scanned image of the page, convert each entry in this bibliography into structured JSON.\n",
+                ],
+            }
+        ],
+    )
+
+    json_result = response.model_dump_json(indent=2, exclude_defaults=True)
+    # Async file write
+    async with aiofiles.open(output_path, "w") as f:
+        await f.write(json_result)
 
 
 # Takes as input the path to a text file and returns formatted JSON following the Entries schema

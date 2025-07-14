@@ -1,4 +1,6 @@
 import base64
+import os
+from pathlib import Path
 import random
 import PIL
 from pydantic import BaseModel, Field
@@ -10,6 +12,7 @@ import anthropic
 
 # from google import genai
 from google.genai import Client
+from google.genai import types
 import aiofiles
 import asyncio
 
@@ -29,6 +32,8 @@ When an entry has an index number in square brackets, place it at the end of the
 Input (Raw OCR Text):
 {input}
 """
+
+opensource_llms = {"qwen2.5-vl-72b-instruct": "qwen", "llama-4-maverick": "meta-llama"}
 
 
 async def encode_image_to_base64(image_path):
@@ -80,7 +85,9 @@ async def gemini_img2txt_async(input_img_path, output_path):
     client = Client()
     img = PIL.Image.open(input_img_path)
     response = await client.aio.models.generate_content(
-        model="gemini-2.5-flash", contents=[prompt_llm, img]
+        model="gemini-2.5-flash", 
+        config= types.GenerateContentConfig(temperature = 0), 
+        contents=[prompt_llm, img]
     )
     async with aiofiles.open(output_path, "w") as f:
         await f.write(response.text)
@@ -94,7 +101,9 @@ async def gemini_img_txt2txt_async(input_img_path, input_txt_path, output_path):
     prompt_ocr_llm = prompt_template_ocr_llm.format(input=input).strip()
     img = PIL.Image.open(input_img_path)
     response = await client.aio.models.generate_content(
-        model="gemini-2.5-flash", contents=[prompt_ocr_llm, img]
+        model="gemini-2.5-flash", 
+        config= types.GenerateContentConfig(temperature = 0),
+        contents=[prompt_ocr_llm, img]
     )
     async with aiofiles.open(output_path, "w") as f:
         await f.write(response.text)
@@ -138,6 +147,91 @@ async def openai_img_txt2txt_async(input_img_path, input_txt_path, output_path):
         await f.write(response.choices[0].message.content)
 
 
+async def openrouter_img2txt_async(input_img_path, output_path):
+    client = AsyncOpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+    )
+    # Read and base64-encode image
+    async with aiofiles.open(input_img_path, "rb") as f:
+        img_bytes = await f.read()
+    base64_img = base64.b64encode(img_bytes).decode("utf-8")
+
+    # Create image content in correct format
+    image_content = {
+        "type": "image_url",
+        "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"},
+    }
+    model = (
+        opensource_llms[str(Path(output_path).parent.name)]
+        + "/"
+        + str(Path(output_path).parent.name)
+    )
+    response = await client.chat.completions.create(
+        model=model,
+        temperature=0,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    image_content,
+                    {
+                        "type": "text",
+                        "text": prompt_llm,
+                    },
+                ],
+            },
+        ],
+    )
+    # Async file write
+    async with aiofiles.open(output_path, "w") as f:
+        await f.write(response.choices[0].message.content)
+
+
+async def openrouter_img_txt2txt_async(input_img_path, input_txt_path, output_path):
+    client = AsyncOpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+    )
+    async with aiofiles.open(input_txt_path, "r") as f:
+        input = await f.read()
+    # Read and base64-encode image
+    async with aiofiles.open(input_img_path, "rb") as f:
+        img_bytes = await f.read()
+    base64_img = base64.b64encode(img_bytes).decode("utf-8")
+
+    # Create image content in correct format
+    image_content = {
+        "type": "image_url",
+        "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"},
+    }
+    prompt_ocr_llm = prompt_template_ocr_llm.format(input=input).strip()
+    model = (
+        opensource_llms[str(Path(output_path).parent.name)]
+        + "/"
+        + str(Path(output_path).parent.name)
+    )
+    response = await client.chat.completions.create(
+        model=model,
+        temperature=0,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    image_content,
+                    {
+                        "type": "text",
+                        "text": prompt_ocr_llm,
+                    },
+                ],
+            },
+        ],
+    )
+    # Async file write
+    async with aiofiles.open(output_path, "w") as f:
+        await f.write(response.choices[0].message.content)
+
+
 async def retry_with_backoff(fn, *args):
     retries, base_delay = 5, 2
 
@@ -168,8 +262,8 @@ async def process_single_async(input_img_paths, output_dir, processor, model):
 
     for i in range(n):
         output_path = str(output_dir / model / (input_img_paths[i].stem + ".txt"))
-
         # Append the tasks to be executed outside the for loop
+        print("Here")
         task = limited_processor(semaphore, processor, input_img_paths[i], output_path)
         tasks.append(task)
     await asyncio.gather(*tasks)
