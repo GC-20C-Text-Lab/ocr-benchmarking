@@ -3,6 +3,7 @@ env/
 images/
 results/
 results-1
+results-2
 data/*
 .DS_Store
 __pycache__/

@@ -263,7 +263,7 @@ async def process_single_async(input_img_paths, output_dir, processor, model):
     for i in range(n):
         output_path = str(output_dir / model / (input_img_paths[i].stem + ".txt"))
         # Append the tasks to be executed outside the for loop
-        print("Here")
+        #print("Here")
         task = limited_processor(semaphore, processor, input_img_paths[i], output_path)
         tasks.append(task)
     await asyncio.gather(*tasks)
