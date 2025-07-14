@@ -542,13 +542,13 @@ def main():
     - Ground truth JSON files located at `project_root/ground-truth/json/gt_kbaa-pXYZ.json`
     - LLM/OCR transcribed JSON files located at:
         - for ground truth text to JSON via LLM:
-            - `project_root/results/json/gt-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+            - `project_root/results/gt-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
         - for OCR text to JSON via LLM:
-            - `project_root/results/json/ocr-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+            - `project_root/results/ocr-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
         - for image to JSON via LLM:
-            - `project_root/results/json/llm-img2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+            - `project_root/results/llm-img2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
         - for text to JSON via LLM:
-            - `project_root/results/json/llm-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+            - `project_root/results/llm-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
 
     The main function will:
     - Gather all ground truth JSON files
@@ -559,23 +559,25 @@ def main():
         - Results are saved in `project_root/benchmarking-results/txt-accuracy`
     """
 
+    root_dir = project_root
+
     # =============
     # Preliminaries
     # =============
 
-    logger.info("Script directory: %s", script_dir)
-    logger.info("Project root: %s", project_root)
+    #logger.info("Script directory: %s", script_dir)
+    logger.info("Project root: %s", root_dir)
 
     # Ground truth
-    ground_truth_dir = os.path.join(project_root, "data", "ground-truth", "json")
+    ground_truth_dir = os.path.join(root_dir, "data", "ground-truth", "json")
     doc_names = get_doc_names(ground_truth_dir, "json", keep_prefix=False)
 
     # results/ paths
-    all_models = get_all_models(
-        os.path.join(project_root, "results", "json", "gt-txt2json"),
-        os.path.join(project_root, "results", "json", "ocr-txt2json"),
-        os.path.join(project_root, "results", "json", "llm-img2json"),
-        os.path.join(project_root, "results", "json", "llm-txt2json")
+    all_models = get_all_models( "json",
+        #os.path.join(root_dir, "results", "gt-txt2json"),
+        #os.path.join(root_dir, "results", "ocr-txt2json"),
+        os.path.join(root_dir, "results", "json", "llm-img2json"),
+        os.path.join(root_dir, "results", "json", "llm-txt2json")
     )
     logger.info(f"Models found: {all_models}")
 
@@ -601,22 +603,23 @@ def main():
 
     # -> Gather each transcribed document and put into dict:
 
-    # Structure: results[model][doc]
-    results_json = {}
-    results_df = {}
+    # Structure: results[(model_type, model)][doc]
+    results_json = {} # Stores collected outputs as JSON
+    results_df = {} # Stores collected outputs as dataframes
 
     for model_type, model in all_models:
         logger.info("Collecting results for model: %s/%s", model_type, model)
 
-        model_path = os.path.join(project_root, "results", "json", model_type, model)
-        results_json[model], _ = get_docs(
+        model_path = os.path.join(root_dir, "results", "json", model_type, model)
+        print(model_path)
+        results_json[(model_type, model)], _ = get_docs(
             model_path, doc_names, "json", name_has_prefix=True
         )
 
-        logger.info("Collected results for model: %s", list(results_json[model].keys()))
+        logger.info("Collected results for model: %s", list(results_json[(model_type, model)].keys()))
 
-        results_df[model] = {
-            doc_name: filter_expected_columns(pd.DataFrame(doc_json['entries'])) for doc_name, doc_json in results_json[model].items()
+        results_df[(model_type, model)] = {
+            doc_name: filter_expected_columns(pd.DataFrame(doc_json['entries'])) for doc_name, doc_json in results_json[(model_type, model)].items()
         }
 
         logger.info("Converted results to dataframes")
@@ -646,13 +649,13 @@ def main():
             logger.info("Computing metrics for document: %s", doc)
 
             normalized_results_data[model_type][model][doc] = compare_dataframes_normalized(
-                ground_truths_df[doc], results_df[model][doc]
+                ground_truths_df[doc], results_df[(model_type, model)][doc]
             )
             nonorm_results_data[model_type][model][doc] = compare_dataframes_exact(
-                ground_truths_df[doc], results_df[model][doc]
+                ground_truths_df[doc], results_df[(model_type, model)][doc]
             )
             fuzzy_results_data[model_type][model][doc] = compare_dataframes_fuzzy(
-                ground_truths_df[doc], results_df[model][doc]
+                ground_truths_df[doc], results_df[(model_type, model)][doc]
             )
 
 
@@ -667,7 +670,7 @@ def main():
         nonorm_df = build_dataframe(f"{model_type}_nonorm_{time}", doc_names, nonorm_results_data[model_type])
         fuzzy_df = build_dataframe(f"{model_type}_fuzzy_{time}", doc_names, fuzzy_results_data[model_type])
 
-        results_path = os.path.join(project_root, "benchmarking-results", "json-accuracy", model_type)
+        results_path = os.path.join(root_dir, "benchmarking-results", "json-accuracy", model_type)
         if not os.path.exists(results_path):
             os.makedirs(results_path)
 
