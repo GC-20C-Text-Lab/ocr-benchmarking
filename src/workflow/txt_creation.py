@@ -272,16 +272,27 @@ async def process_single_async(input_img_paths, output_dir, processor, model):
 async def process_double_async(
     input_img_paths, input_txt_paths, output_dir, processor, model
 ):
+    input_img_paths = sorted(input_img_paths)
+    input_txt_paths = sorted(input_txt_paths)
     n = len(input_img_paths)
     max_concurrency = 4  # Safe limit for Tier 1
     semaphore = asyncio.Semaphore(max_concurrency)
     tasks = []
 
+    # Validate inputs
+    for i in range(n):
+        if input_img_paths[i].stem != input_txt_paths[i].stem:
+            raise NameError(f"Your image '{input_img_paths[i]}' and text '{input_txt_paths[i]}' files don't match")
+        print(f"Matched image file '{input_img_paths[i]}' with text file {input_txt_paths[i]}")
+
+    # Call function asynchronously
     for i in range(n):
         output_path = str(output_dir / model / (input_img_paths[i].stem + ".txt"))
         task = limited_processor(
             semaphore, processor, input_img_paths[i], input_txt_paths[i], output_path
         )
         tasks.append(task)
+        print(f"Added task with image file '{input_img_paths[i]}' and text file {input_txt_paths[i]}")
 
     await asyncio.gather(*tasks)
+
