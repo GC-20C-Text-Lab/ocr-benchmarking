@@ -88,9 +88,9 @@ def normalize_cell_value(x):
     """
     if isinstance(x, str):
         x_str = str(x).strip().lower()
-        if x_str in ("", "null"):
-            return None
         return x_str
+    else:
+        return x
 
 
 def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -130,20 +130,20 @@ def ascii_only_punct_removed_lower(x):
 
 # ----------------- Helper Functions -----------------
 
-# def load_json_safely(path):
-#     """Load JSON into a DataFrame, or return None if missing/error."""
-#     if not os.path.isfile(path):
-#         logger.warning(f"Could not load JSON at {path}: not a file")
-#         return None
-#     try:
-#         with open(path, 'r') as file:
-#             file_json = json.loads(file.read())
-#             entries = file_json['entries']
-#             df = pd.DataFrame(entries)
-#             return df
-#     except Exception as e:
-#         logger.warning(f"Could not load JSON at {path}: {e}")
-#         return None
+def load_json_safely(path):
+    """Load JSON into a DataFrame, or return None if missing/error."""
+    if not os.path.isfile(path):
+        logger.warning(f"Could not load JSON at {path}: not a file")
+        return None
+    try:
+        with open(path, 'r') as file:
+            file_json = json.loads(file.read())
+            entries = file_json['entries']
+            df = pd.DataFrame(entries)
+            return df
+    except Exception as e:
+        logger.warning(f"Could not load JSON at {path}: {e}")
+        return None
 
 
 def filter_expected_columns(df):
@@ -158,7 +158,7 @@ def filter_expected_columns(df):
     # Check if all expected columns exist
     for col in EXPECTED_COLUMNS:
         if col not in df.columns:
-            df[col] = np.nan
+            df[col] = pd.NA
     # Reindex to EXACTLY those columns => remove extras
     df = df.reindex(columns=EXPECTED_COLUMNS)
     # Normalize all cells (for EXACT matching)
@@ -180,7 +180,7 @@ def make_match_dataframe(
 
     gt_df and pred_df must have the same dimensions.
     """
-    match_df = pd.DataFrame().reindex_like(gt_df)
+    match_df = pd.DataFrame().reindex_like(gt_df).astype(bool)
 
     nrows = gt_df.shape[0]
     ncols = len(EXPECTED_COLUMNS)
@@ -221,29 +221,70 @@ def fuzzy_cell_matcher(gt_cell, pred_cell, options):
         return gt_cell == pred_cell
 
 
-def compare_dataframes(gt_df, pred_df, method, options={"threshold": FUZZY_THRESHOLD}):
+def compare_dataframes_core(gt_df: pd.DataFrame, pred_df: pd.DataFrame, method: str, options={"threshold": FUZZY_THRESHOLD}):
+    """
+    Compares the two dataframes, gt_df and pred_df, using the method parameter (exact, normalized, fuzzy).
+    If gt_df has one more row than pred_df, then add one empty row to the top of pred_df to normalize dimensions.
+    
+    Returns a dictionary containing the keys and corresponding values:
+    - gt_df_adj: A copy of the ground truth dataframe after dimensional adjustments
+    - pred_df_adj: A copy of the predicted dataframe after dimensional adjustments
+    - match_df: A boolean dataframe where a cell is true if and only if the corresponding cell in gt_df_adj and pred_df_adj match.
+    - results: A dictionary with selected results
+    """
     # Check if any dataframe is empty
     if gt_df is None or pred_df is None:
-        return {
+        results = {
             "matches": np.nan,
             "total": np.nan,
             "mismatch_bool": True,
             "pred_nrows": 0,
+            "pred_adj_nrows": 0,
             "gt_nrows": 0,
         }
+        return {
+            "gt_df_adj": None,
+            "pred_df_adj": None,
+            "match_df": None,
+            "results": results
+        }
+    
+    # Copy dataframes since we are potentially modifying them
+    gt_df_temp = gt_df.copy()
+    pred_df_temp = pred_df.copy()
 
     # Check for row mismatch
-    gt_rows = gt_df.shape[0]
-    pred_rows = pred_df.shape[0]
+    gt_rows = gt_df_temp.shape[0]
+    pred_rows = pred_df_temp.shape[0]
 
-    if gt_rows != pred_rows:
-        return {
+    # If gt_row is one more than pred_rows, add empty row to beginning of pred_df due to observation
+    # of missing empty rows.
+    #
+    # For other row number mismatches, skip comparison and return a mismatch.
+    if gt_rows == pred_rows + 1:
+        pred_df_temp.loc[-1] = np.nan
+        pred_df_temp = pred_df_temp.fillna(EXPECTED_COLUMNS_DEFAULTS)
+        pred_df_temp.index = pred_df_temp.index + 1
+        pred_df_temp.sort_index(inplace=True)
+    elif gt_rows != pred_rows:
+        results = {
             "matches": np.nan,
             "total": np.nan,
             "mismatch_bool": True,
             "pred_nrows": pred_rows,
+            "pred_adj_nrows": pred_rows,
             "gt_nrows": gt_rows,
         }
+        return {
+            "gt_df_adj": gt_df_temp,
+            "pred_df_adj": pred_df_temp,
+            "match_df": None,
+            "results": results
+        }
+        
+    
+    # Determine adjusted row count
+    pred_adj_rows = pred_df_temp.shape[0]
 
     # Select matching method
     matcher = {
@@ -253,7 +294,7 @@ def compare_dataframes(gt_df, pred_df, method, options={"threshold": FUZZY_THRES
     }.get(method, "exact")
 
     # Create dataframe for matches and results dict
-    match_df = make_match_dataframe(gt_df, pred_df, matcher, options)
+    match_df = make_match_dataframe(gt_df_temp, pred_df_temp, matcher, options)
     results = {}
 
     # Count number of True values in each column and add to returned results
@@ -267,9 +308,26 @@ def compare_dataframes(gt_df, pred_df, method, options={"threshold": FUZZY_THRES
     results["total"] = gt_rows * len(EXPECTED_COLUMNS)
     results["mismatch_bool"] = False
     results["pred_nrows"] = pred_rows
+    results["pred_adj_nrows"] = pred_adj_rows
     results["gt_nrows"] = gt_rows
 
-    return results
+    return {
+        "gt_df_adj": gt_df_temp,
+        "pred_df_adj": pred_df_temp,
+        "match_df": match_df,
+        "results": results
+    }
+
+
+def compare_dataframes(gt_df: pd.DataFrame, pred_df: pd.DataFrame, method: str, options={"threshold": FUZZY_THRESHOLD}):
+    """
+    Compares the two dataframes, gt_df and pred_df, using the method parameter (exact, normalized, fuzzy).
+    If gt_df has one more row than pred_df, then add one empty row to the top of pred_df to match dimensions.
+    Otherwise, no comparison is made and "mismatch_bool" in the returned dictionary is True.
+    """
+
+    compare_output = compare_dataframes_core(gt_df, pred_df, method, options)
+    return compare_output["results"]
 
 
 # def compare_dataframes_old_method(gt_df, pred_df, method, options={}):
@@ -400,7 +458,7 @@ def build_dataframe(title, doc_names, results_data):
     - `docN:matches`: Number of matching cells in document if row counts match, otherwise NaN
     - `docN:total`: Total matching cells in document if row counts match, otherwise NaN
     - `docN:matches_pct`: Percent of matching cells if row counts match, otherwise NaN
-    - `docN:mismatch_bool`: True if number of rows between ground truth and predicted data matches. 
+    - `docN:mismatch_bool`: True if number of rows between ground truth and predicted data matches or could be adjusted to match.
     - `docN:pred_nrows`: Number of rows in the predicted data.
     - `docN:gt_nrows`: Number of rows in the ground truth data.
 
@@ -430,6 +488,7 @@ def build_dataframe(title, doc_names, results_data):
         model_sum_total = 0
         model_sum_mismatches = 0
         model_sum_pred_nrows = 0
+        model_sum_pred_adj_nrows = 0
         model_sum_gt_nrows = 0
         model_sum_counted_nrows = 0
         model_col_results = {}
@@ -456,6 +515,7 @@ def build_dataframe(title, doc_names, results_data):
                 model_sum_total += cell_data["total"] if not pd.isna(cell_data["total"]) else 0
                 model_sum_mismatches += 1 if cell_data["mismatch_bool"] else 0
                 model_sum_pred_nrows += cell_data["pred_nrows"]
+                model_sum_pred_adj_nrows += cell_data["pred_adj_nrows"]
                 model_sum_gt_nrows += cell_data["gt_nrows"]
                 model_sum_counted_nrows += cell_data["gt_nrows"] if not cell_data["mismatch_bool"] else 0
         
@@ -466,6 +526,7 @@ def build_dataframe(title, doc_names, results_data):
         df.at["__ALL__:matches_pct", model] = (model_sum_matches / model_sum_total) * 100 if model_sum_total > 0 else 0
         df.at["__ALL__:mismatched_dim_count", model] = model_sum_mismatches
         df.at["__ALL__:pred_nrows", model] = model_sum_pred_nrows
+        df.at["__ALL__:pred_adj_nrows", model] = model_sum_pred_adj_nrows
         df.at["__ALL__:gt_nrows", model] = model_sum_gt_nrows
         df.at["__ALL__:counted_nrows", model] = model_sum_counted_nrows
 
@@ -481,13 +542,13 @@ def main():
     - Ground truth JSON files located at `project_root/ground-truth/json/gt_kbaa-pXYZ.json`
     - LLM/OCR transcribed JSON files located at:
         - for ground truth text to JSON via LLM:
-            - `project_root/results/json/gt-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+            - `project_root/results/gt-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
         - for OCR text to JSON via LLM:
-            - `project_root/results/json/ocr-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+            - `project_root/results/ocr-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
         - for image to JSON via LLM:
-            - `project_root/results/json/llm-img2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+            - `project_root/results/llm-img2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
         - for text to JSON via LLM:
-            - `project_root/results/json/llm-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+            - `project_root/results/llm-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
 
     The main function will:
     - Gather all ground truth JSON files
@@ -498,23 +559,25 @@ def main():
         - Results are saved in `project_root/benchmarking-results/txt-accuracy`
     """
 
+    root_dir = project_root
+
     # =============
     # Preliminaries
     # =============
 
-    logger.info("Script directory: %s", script_dir)
-    logger.info("Project root: %s", project_root)
+    #logger.info("Script directory: %s", script_dir)
+    logger.info("Project root: %s", root_dir)
 
     # Ground truth
-    ground_truth_dir = os.path.join(project_root, "data", "ground-truth", "json")
+    ground_truth_dir = os.path.join(root_dir, "data", "ground-truth", "json")
     doc_names = get_doc_names(ground_truth_dir, "json", keep_prefix=False)
 
     # results/ paths
-    all_models = get_all_models(
-        os.path.join(project_root, "results", "json", "gt-txt2json"),
-        os.path.join(project_root, "results", "json", "ocr-txt2json"),
-        os.path.join(project_root, "results", "json", "llm-img2json"),
-        os.path.join(project_root, "results", "json", "llm-txt2json")
+    all_models = get_all_models( "json",
+        #os.path.join(root_dir, "results", "gt-txt2json"),
+        #os.path.join(root_dir, "results", "ocr-txt2json"),
+        os.path.join(root_dir, "results", "json", "llm-img2json"),
+        os.path.join(root_dir, "results", "json", "llm-txt2json")
     )
     logger.info(f"Models found: {all_models}")
 
@@ -540,22 +603,23 @@ def main():
 
     # -> Gather each transcribed document and put into dict:
 
-    # Structure: results[model][doc]
-    results_json = {}
-    results_df = {}
+    # Structure: results[(model_type, model)][doc]
+    results_json = {} # Stores collected outputs as JSON
+    results_df = {} # Stores collected outputs as dataframes
 
     for model_type, model in all_models:
         logger.info("Collecting results for model: %s/%s", model_type, model)
 
-        model_path = os.path.join(project_root, "results", "json", model_type, model)
-        results_json[model], _ = get_docs(
+        model_path = os.path.join(root_dir, "results", "json", model_type, model)
+        print(model_path)
+        results_json[(model_type, model)], _ = get_docs(
             model_path, doc_names, "json", name_has_prefix=True
         )
 
-        logger.info("Collected results for model: %s", list(results_json[model].keys()))
+        logger.info("Collected results for model: %s", list(results_json[(model_type, model)].keys()))
 
-        results_df[model] = {
-            doc_name: filter_expected_columns(pd.DataFrame(doc_json['entries'])) for doc_name, doc_json in results_json[model].items()
+        results_df[(model_type, model)] = {
+            doc_name: filter_expected_columns(pd.DataFrame(doc_json['entries'])) for doc_name, doc_json in results_json[(model_type, model)].items()
         }
 
         logger.info("Converted results to dataframes")
@@ -585,13 +649,13 @@ def main():
             logger.info("Computing metrics for document: %s", doc)
 
             normalized_results_data[model_type][model][doc] = compare_dataframes_normalized(
-                ground_truths_df[doc], results_df[model][doc]
+                ground_truths_df[doc], results_df[(model_type, model)][doc]
             )
             nonorm_results_data[model_type][model][doc] = compare_dataframes_exact(
-                ground_truths_df[doc], results_df[model][doc]
+                ground_truths_df[doc], results_df[(model_type, model)][doc]
             )
             fuzzy_results_data[model_type][model][doc] = compare_dataframes_fuzzy(
-                ground_truths_df[doc], results_df[model][doc]
+                ground_truths_df[doc], results_df[(model_type, model)][doc]
             )
 
 
@@ -606,7 +670,7 @@ def main():
         nonorm_df = build_dataframe(f"{model_type}_nonorm_{time}", doc_names, nonorm_results_data[model_type])
         fuzzy_df = build_dataframe(f"{model_type}_fuzzy_{time}", doc_names, fuzzy_results_data[model_type])
 
-        results_path = os.path.join(project_root, "benchmarking-results", "json-accuracy", model_type)
+        results_path = os.path.join(root_dir, "benchmarking-results", "json-accuracy", model_type)
         if not os.path.exists(results_path):
             os.makedirs(results_path)
 
