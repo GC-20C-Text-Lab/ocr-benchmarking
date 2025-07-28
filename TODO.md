@@ -19,7 +19,7 @@
 - [ ] Make sure environment.yaml is up to date as well
 
 # Benchmarking
-- [ ] For all:
+- For all:
     - [ ] Make sure comments/attributions are up to date
     - [ ] Make sure import statements at the top have unused imports removed
     - [ ] Remove old commented-out code
@@ -29,16 +29,16 @@
 - [ ] If 'file_retrieval.py' is still in use, update comments
 
 # Workflow
-- [ ] json_creation.py
+- json_creation.py
     - [ ] Update comments and attributions
     - [ ] Remove unused imports
     - [ ] Remove or fix nonworking code
     - [ ] Remove commented out code
     - [ ] If time, figure out Gemini async
-- [ ] txt_creation.py
+- txt_creation.py
     - [ ] Update comments and attributions
     - [ ] Remove unused imports
-- [ ] txt_pipeline.ipynb
+- txt_pipeline.ipynb
     - [ ] Update comments and attributions
         - [ ] Write more detailed instructions for running on Windows with anaconda
         - [ ] Make sure each cell is properly labled and described
