@@ -1,15 +1,37 @@
 """
-Benchmarking LLM vs. IMG JSON extraction,
-generating THREE tables now:
- - Exact matching
- - Normalized matching
- - Fuzzy matching (Jaro-Winkler, threshold=0.90)
+Benchmarking LLM JSON extraction.
+
+We open JSON output files in a tabular format (Pandas) and fill in empty values with defaults.
+Then, we perform cell-by-cell matching.
+
+The output has one row for each document and metric:
+    - `docN:__COL__:<col_name>`: Number of matching cells in `col_name`. Only exists if row counts match.
+    - `docN:matches`: Number of matching cells in document if row counts match, otherwise NaN
+    - `docN:total`: Total matching cells in document if row counts match, otherwise NaN
+    - `docN:matches_pct`: Percent of matching cells if row counts match, otherwise NaN
+    - `docN:mismatch_bool`: False if number of rows between ground truth and predicted data matches or could be adjusted to match.
+    - `docN:pred_nrows`: Number of rows in the predicted data.
+    - `docN:gt_nrows`: Number of rows in the ground truth data.
+
+The output also has rows for aggregate metrics, namely:
+    - `__ALL__:__COL__:<col_name>`: Number of matching cells in `col_name` for all pages where row counts match.
+    - `__ALL__:matches`: Number of matching cells among pages with matching row counts
+    - `__ALL__:total`: Total number of cells among pages with matching row counts
+    - `__ALL__:matches_pct`: Percent of `__ALL__:matches` out of `__ALL__:total`, or 0 if total is 0.
+    - `__ALL__:mismatched_dim_count`: Number of pages with mismatched row counts.
+    - `__ALL__:pred_nrows`: Total number of rows in the prediction.
+    - `__ALL__:gt_nrows`: Total number of rows in the ground truth.
+    - `__ALL__:counted_nrows`: Total number of rows from pages with matching row counts.
  
-Tables are saved under project-root/benchmarking-results/json-accuracy/
- - gt-txt2json   # Ground truth text to JSON via LLM
- - ocr-txt2json  # OCR text to JSON via LLM
- - llm-img2json  # LLM image to JSON via LLM
- - llm-txt2json  # LLM text to JSON via LLM
+Tables are saved under ../../benchmarking-results/json-accuracy/
+ - llm-img2json  *LLM image to JSON via LLM*   
+    - llm-img2json_fuzzy_%Y-%m-%d_%H:%M:%S.csv       *See `fuzzy_cell_matcher`*
+    - llm-img2json_nonorm_%Y-%m-%d_%H:%M:%S.csv      *See `exact_cell_matcher`*
+    - llm-img2json_normalized_%Y-%m-%d_%H:%M:%S.csv  *See `normalized_cell_matcher`*
+ - llm-txt2json  *LLM text to JSON via LLM*
+    - llm-txt2json_fuzzy_%Y-%m-%d_%H:%M:%S.csv
+    - llm-txt2json_nonorm_%Y-%m-%d_%H:%M:%S.csv
+    - llm-txt2json_normalized_%Y-%m-%d_%H:%M:%S.csv
 
 Matching rules:
  - EXACT: cell1 == cell2 (after basic lowercasing/whitespace trimming)
@@ -453,26 +475,9 @@ def build_dataframe(title, doc_names, results_data):
     Build a Pandas dataframe for a given results_data and doc_lengths structure.
     - results_data[model][doc] => (matches, total, mismatch_bool, pred_nrows)
 
-    The dataframe has one row for each document and metric:
-    - `docN:__COL__:<col_name>`: Number of matching cells in `col_name`. Only exists if row counts match.
-    - `docN:matches`: Number of matching cells in document if row counts match, otherwise NaN
-    - `docN:total`: Total matching cells in document if row counts match, otherwise NaN
-    - `docN:matches_pct`: Percent of matching cells if row counts match, otherwise NaN
-    - `docN:mismatch_bool`: True if number of rows between ground truth and predicted data matches or could be adjusted to match.
-    - `docN:pred_nrows`: Number of rows in the predicted data.
-    - `docN:gt_nrows`: Number of rows in the ground truth data.
+    See the top of the file for information about metrics.
 
-    The dataframe also has rows for aggregate metrics, namely:
-    - `__ALL__:__COL__:<col_name>`: Number of matching cells in `col_name` for all pages where row counts match.
-    - `__ALL__:matches`: Number of matching cells among pages with matching row counts
-    - `__ALL__:total`: Total number of cells among pages with matching row counts
-    - `__ALL__:matches_pct`: `__ALL__:matches` divided by `__ALL__:total`, or 0 if `__ALL__:total` is 0.
-    - `__ALL__:mismatched_dim_count`: Number of pages with mismatched row counts.
-    - `__ALL__:pred_nrows`: Total number of rows in the prediction.
-    - `__ALL__:gt_nrows`: Total number of rows in the ground truth.
-    - `__ALL__:counted_nrows`: Total number of rows from pages with matching row counts.
-
-    The dataframe has one column for each model used, like pytesseract.
+    The dataframe has one column for each model used and one row for each metric (per page).
 
     Returns the dataframe for the results data.
     """
@@ -534,151 +539,152 @@ def build_dataframe(title, doc_names, results_data):
 
 
 # ----------------- Main -----------------
+# The below code is redundant. Please run the code in pipeline.ipynb instead.
 
 
-def main():
-    """
-    Prerequisites:
-    - Ground truth JSON files located at `project_root/ground-truth/json/gt_kbaa-pXYZ.json`
-    - LLM/OCR transcribed JSON files located at:
-        - for ground truth text to JSON via LLM:
-            - `project_root/results/gt-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
-        - for OCR text to JSON via LLM:
-            - `project_root/results/ocr-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
-        - for image to JSON via LLM:
-            - `project_root/results/llm-img2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
-        - for text to JSON via LLM:
-            - `project_root/results/llm-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+# def main():
+#     """
+#     Prerequisites:
+#     - Ground truth JSON files located at `project_root/ground-truth/json/gt_kbaa-pXYZ.json`
+#     - LLM/OCR transcribed JSON files located at:
+#         - for ground truth text to JSON via LLM:
+#             - `project_root/results/gt-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+#         - for OCR text to JSON via LLM:
+#             - `project_root/results/ocr-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+#         - for image to JSON via LLM:
+#             - `project_root/results/llm-img2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
+#         - for text to JSON via LLM:
+#             - `project_root/results/llm-txt2json/<MODEL-NAME>/<MODEL-NAME>_img_kbaa-pXYZ.json`
 
-    The main function will:
-    - Gather all ground truth JSON files
-    - For each ground truth JSON file and for each LLM/OCR model, open the JSON file's entries object as a Pandas dataframe
-    - Clean all the JSON files (either basic cleaning and normalization)
-    - Compute metrics for each file and model
-    - Save results in two CSV files (one for normalized, one for non-normalized)
-        - Results are saved in `project_root/benchmarking-results/txt-accuracy`
-    """
+#     The main function will:
+#     - Gather all ground truth JSON files
+#     - For each ground truth JSON file and for each LLM/OCR model, open the JSON file's entries object as a Pandas dataframe
+#     - Clean all the JSON files (either basic cleaning and normalization)
+#     - Compute metrics for each file and model
+#     - Save results in two CSV files (one for normalized, one for non-normalized)
+#         - Results are saved in `project_root/benchmarking-results/txt-accuracy`
+#     """
 
-    root_dir = project_root
+#     root_dir = project_root
 
-    # =============
-    # Preliminaries
-    # =============
+#     # =============
+#     # Preliminaries
+#     # =============
 
-    #logger.info("Script directory: %s", script_dir)
-    logger.info("Project root: %s", root_dir)
+#     #logger.info("Script directory: %s", script_dir)
+#     logger.info("Project root: %s", root_dir)
 
-    # Ground truth
-    ground_truth_dir = os.path.join(root_dir, "data", "ground-truth", "json")
-    doc_names = get_doc_names(ground_truth_dir, "json", keep_prefix=False)
+#     # Ground truth
+#     ground_truth_dir = os.path.join(root_dir, "data", "ground-truth", "json")
+#     doc_names = get_doc_names(ground_truth_dir, "json", keep_prefix=False)
 
-    # results/ paths
-    all_models = get_all_models( "json",
-        #os.path.join(root_dir, "results", "gt-txt2json"),
-        #os.path.join(root_dir, "results", "ocr-txt2json"),
-        os.path.join(root_dir, "results", "json", "llm-img2json"),
-        os.path.join(root_dir, "results", "json", "llm-txt2json")
-    )
-    logger.info(f"Models found: {all_models}")
+#     # results/ paths
+#     all_models = get_all_models( "json",
+#         #os.path.join(root_dir, "results", "gt-txt2json"),
+#         #os.path.join(root_dir, "results", "ocr-txt2json"),
+#         os.path.join(root_dir, "results", "json", "llm-img2json"),
+#         os.path.join(root_dir, "results", "json", "llm-txt2json")
+#     )
+#     logger.info(f"Models found: {all_models}")
 
-    # ===========
-    # Gather files
-    # ===========
+#     # ===========
+#     # Gather files
+#     # ===========
 
-    # -> Gather ground truths and put into dict:
+#     # -> Gather ground truths and put into dict:
 
-    ground_truths_json, _ = get_docs(
-        ground_truth_dir, doc_names, "json", name_has_prefix=True
-    )
+#     ground_truths_json, _ = get_docs(
+#         ground_truth_dir, doc_names, "json", name_has_prefix=True
+#     )
 
-    logger.info("Collected ground truth results: %s", list(ground_truths_json.keys()))
+#     logger.info("Collected ground truth results: %s", list(ground_truths_json.keys()))
 
-    # Convert JSON to dataframe
+#     # Convert JSON to dataframe
 
-    ground_truths_df = {
-        doc_name: filter_expected_columns(pd.DataFrame(doc_json['entries'])) for doc_name, doc_json in ground_truths_json.items()
-    }
+#     ground_truths_df = {
+#         doc_name: filter_expected_columns(pd.DataFrame(doc_json['entries'])) for doc_name, doc_json in ground_truths_json.items()
+#     }
 
-    logger.info("Converted ground truths to dataframes")
+#     logger.info("Converted ground truths to dataframes")
 
-    # -> Gather each transcribed document and put into dict:
+#     # -> Gather each transcribed document and put into dict:
 
-    # Structure: results[(model_type, model)][doc]
-    results_json = {} # Stores collected outputs as JSON
-    results_df = {} # Stores collected outputs as dataframes
+#     # Structure: results[(model_type, model)][doc]
+#     results_json = {} # Stores collected outputs as JSON
+#     results_df = {} # Stores collected outputs as dataframes
 
-    for model_type, model in all_models:
-        logger.info("Collecting results for model: %s/%s", model_type, model)
+#     for model_type, model in all_models:
+#         logger.info("Collecting results for model: %s/%s", model_type, model)
 
-        model_path = os.path.join(root_dir, "results", "json", model_type, model)
-        print(model_path)
-        results_json[(model_type, model)], _ = get_docs(
-            model_path, doc_names, "json", name_has_prefix=True
-        )
+#         model_path = os.path.join(root_dir, "results", "json", model_type, model)
+#         print(model_path)
+#         results_json[(model_type, model)], _ = get_docs(
+#             model_path, doc_names, "json", name_has_prefix=True
+#         )
 
-        logger.info("Collected results for model: %s", list(results_json[(model_type, model)].keys()))
+#         logger.info("Collected results for model: %s", list(results_json[(model_type, model)].keys()))
 
-        results_df[(model_type, model)] = {
-            doc_name: filter_expected_columns(pd.DataFrame(doc_json['entries'])) for doc_name, doc_json in results_json[(model_type, model)].items()
-        }
+#         results_df[(model_type, model)] = {
+#             doc_name: filter_expected_columns(pd.DataFrame(doc_json['entries'])) for doc_name, doc_json in results_json[(model_type, model)].items()
+#         }
 
-        logger.info("Converted results to dataframes")
+#         logger.info("Converted results to dataframes")
 
 
-    # ===============
-    # Compute metrics
-    # ===============
+#     # ===============
+#     # Compute metrics
+#     # ===============
 
-    normalized_results_data = {}
-    nonorm_results_data = {}
-    fuzzy_results_data = {}
+#     normalized_results_data = {}
+#     nonorm_results_data = {}
+#     fuzzy_results_data = {}
 
-    for model_type, model in all_models:
-        normalized_results_data[model_type] = normalized_results_data.get(model_type, {})
-        normalized_results_data[model_type][model] = normalized_results_data[model_type].get(model, {})
+#     for model_type, model in all_models:
+#         normalized_results_data[model_type] = normalized_results_data.get(model_type, {})
+#         normalized_results_data[model_type][model] = normalized_results_data[model_type].get(model, {})
 
-        nonorm_results_data[model_type] = nonorm_results_data.get(model_type, {})
-        nonorm_results_data[model_type][model] = nonorm_results_data[model_type].get(model, {})
+#         nonorm_results_data[model_type] = nonorm_results_data.get(model_type, {})
+#         nonorm_results_data[model_type][model] = nonorm_results_data[model_type].get(model, {})
 
-        fuzzy_results_data[model_type] = fuzzy_results_data.get(model_type, {})
-        fuzzy_results_data[model_type][model] = fuzzy_results_data[model_type].get(model, {})
+#         fuzzy_results_data[model_type] = fuzzy_results_data.get(model_type, {})
+#         fuzzy_results_data[model_type][model] = fuzzy_results_data[model_type].get(model, {})
         
-        logger.info("Computing metrics for model: %s", model)
+#         logger.info("Computing metrics for model: %s", model)
 
-        for doc in doc_names:
-            logger.info("Computing metrics for document: %s", doc)
+#         for doc in doc_names:
+#             logger.info("Computing metrics for document: %s", doc)
 
-            normalized_results_data[model_type][model][doc] = compare_dataframes_normalized(
-                ground_truths_df[doc], results_df[(model_type, model)][doc]
-            )
-            nonorm_results_data[model_type][model][doc] = compare_dataframes_exact(
-                ground_truths_df[doc], results_df[(model_type, model)][doc]
-            )
-            fuzzy_results_data[model_type][model][doc] = compare_dataframes_fuzzy(
-                ground_truths_df[doc], results_df[(model_type, model)][doc]
-            )
+#             normalized_results_data[model_type][model][doc] = compare_dataframes_normalized(
+#                 ground_truths_df[doc], results_df[(model_type, model)][doc]
+#             )
+#             nonorm_results_data[model_type][model][doc] = compare_dataframes_exact(
+#                 ground_truths_df[doc], results_df[(model_type, model)][doc]
+#             )
+#             fuzzy_results_data[model_type][model][doc] = compare_dataframes_fuzzy(
+#                 ground_truths_df[doc], results_df[(model_type, model)][doc]
+#             )
 
 
-    # =====================================
-    # Put metrics in table and save results
-    # =====================================
+#     # =====================================
+#     # Put metrics in table and save results
+#     # =====================================
 
-    time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # Iterate over model types:
-    for model_type in normalized_results_data.keys():
-        normalized_df = build_dataframe(f"{model_type}_normalized_{time}", doc_names, normalized_results_data[model_type])
-        nonorm_df = build_dataframe(f"{model_type}_nonorm_{time}", doc_names, nonorm_results_data[model_type])
-        fuzzy_df = build_dataframe(f"{model_type}_fuzzy_{time}", doc_names, fuzzy_results_data[model_type])
+#     time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+#     # Iterate over model types:
+#     for model_type in normalized_results_data.keys():
+#         normalized_df = build_dataframe(f"{model_type}_normalized_{time}", doc_names, normalized_results_data[model_type])
+#         nonorm_df = build_dataframe(f"{model_type}_nonorm_{time}", doc_names, nonorm_results_data[model_type])
+#         fuzzy_df = build_dataframe(f"{model_type}_fuzzy_{time}", doc_names, fuzzy_results_data[model_type])
 
-        results_path = os.path.join(root_dir, "benchmarking-results", "json-accuracy", model_type)
-        if not os.path.exists(results_path):
-            os.makedirs(results_path)
+#         results_path = os.path.join(root_dir, "benchmarking-results", "json-accuracy", model_type)
+#         if not os.path.exists(results_path):
+#             os.makedirs(results_path)
 
-        normalized_df.to_csv(os.path.join(results_path, f"{model_type}_normalized_{time}.csv"))
-        nonorm_df.to_csv(os.path.join(results_path, f"{model_type}_nonorm_{time}.csv"))
-        fuzzy_df.to_csv(os.path.join(results_path, f"{model_type}_fuzzy_{time}.csv"))
+#         normalized_df.to_csv(os.path.join(results_path, f"{model_type}_normalized_{time}.csv"))
+#         nonorm_df.to_csv(os.path.join(results_path, f"{model_type}_nonorm_{time}.csv"))
+#         fuzzy_df.to_csv(os.path.join(results_path, f"{model_type}_fuzzy_{time}.csv"))
     
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
