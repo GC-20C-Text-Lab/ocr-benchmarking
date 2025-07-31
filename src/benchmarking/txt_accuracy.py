@@ -1,29 +1,20 @@
 """
-Benchmarking OCR vs. LLM for text extraction, parallelized with joblib + rapidfuzz.
-
-Generates TWO Pandas dataframes in TWO .csv files:
-
-1) Normalized Results
-   - Non-ASCII removed entirely
-   - Lowercase
-   - Remove punctuation => only [a-z0-9] plus spaces
-   - Collapse multiple spaces
-   - Strip leading/trailing
-   - Remove line breaks/tabs
-
-2) Non-normalized Results
-   - Preserve punctuation, casing, accented letters
-   - Remove line breaks/tabs
-   - Collapse multiple spaces
-   - Strip leading/trailing
+Benchmarking OCR vs. LLM for text extraction. Uses RapidFuzz (for CER, TSR) and JiWER (for WER).
 
 Each type of results has 4 rows for each document and for all documents:
    1) Levenshtein distance ({doc}:dist_char)
-   2) ground-truth doc length (for that table's version) ({doc}:gt_length)
+   2) ground-truth doc length (for that table's version) ({doc}:doc_len)
    3) CER% (distance / length_of_that_version) ({doc}:cer_pct)
    4) WER% ({doc}:wer_pct)
+   5) Token Sort Ratio ({doc}:token_sort_ratio)
 
-Each model is on a separate column.
+Output structure:
+- ../../benchmarking-results/txt-accuracy/
+    - llm-img2txt       *(Image transcription to text using LLMs)*
+    - ocr-img2txt       *(Image transcription to text using conventional OCR)*
+    - ocr-llm-img2txt   *(Image + OCR post-correction using LLMs)*
+        - nonorm_%Y-%m-%d_%H:%M:%S.csv      *See `clean_text_nonorm`*
+        - normalized_%Y-%m-%d_%H:%M:%S.csv  *See `clean_text_normalized`*
 
 Original authors: Niclas Griesshaber, Gavin Greif, Robin Greif
 New authors: Tim Yu, Muhammad Khalid
@@ -91,45 +82,6 @@ def clean_text_nonorm(text, index_numbers=True):
     return text.strip()
 
 
-def clean_json_nonorm(data, index_numbers=True):
-    """
-    Minimal cleaning:
-      - Remove index numbers (if specified)
-      - Remove linebreaks/tabs (replace with space)
-      - Remove all instances of \"- \" (dash space; word separated by line break)
-      - Remove extra spaces of number intervals separated by line break
-      - Collapse multiple spaces
-      - Strip leading/trailing
-      - Preserve punctuation, casing, accented letters
-    """
-    for entry in data["entries"]:
-
-        for key, text in entry.items():
-            # Skips over integers since we'll compare them directly
-            if isinstance(text, str):
-
-                # If index_numbers == False, remove index numbers
-                text = (
-                    re.sub(r" *\[ *[0-9]+ *\] *", " ", text)
-                    if not index_numbers
-                    else text
-                )
-
-                # Replace various forms of whitespace with space
-                text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
-
-                # Replace multiple spaces with single space
-                text = re.sub(r"\s+", " ", text)
-
-                # Remove instances of "- " for words separated by line break.
-                text = re.sub(r"([A-Za-z]+)- ([a-z]+)", r"\1\2", text)
-
-                # Replace spaces in "- " for number ranges and abbreviations separated by line break.
-                text = re.sub(r"([0-9A-Z]+)- ([0-9A-Z]+)", r"\1-\2", text)
-                entry[key] = text.strip()
-    return data
-
-
 def clean_text_normalized(text, index_numbers=True):
     """
     Fully normalized:
@@ -162,59 +114,8 @@ def clean_text_normalized(text, index_numbers=True):
     return text.strip()
 
 
-def clean_json_normalized(data, index_numbers=True):
-    """
-    Fully normalized:
-      - Remove linebreaks/tabs
-      - Remove all instances of \"- \" (dash space; word separated by line break)
-      - Remove extra spaces of number intervals separated by line break
-      - Remove all non-ASCII (accented letters are dropped)
-      - Convert to lowercase
-      - Remove punctuation => keep only [a-z0-9] plus spaces
-      - Collapse multiple spaces
-      - Strip leading/trailing
-
-    Returns:
-        - Cleaned JSON object
-    """
-    for entry in data["entries"]:
-        for key, text in entry.items():
-
-            # Skips over integers since we'll compare them directly
-            if isinstance(text, str):
-                # Remove linebreaks/tabs
-                text = clean_text_nonorm(text, index_numbers)
-
-                # Remove all non-ASCII
-                text = text.encode("ascii", errors="ignore").decode("ascii")
-
-                # Lowercase
-                text = text.lower()
-
-                # Replace periods with a space before removing other punctuation
-                text = re.sub(r"\.", " ", text)
-
-                # Keep only [a-z0-9] + space
-                text = re.sub(r"[^a-z0-9 ]+", "", text)
-
-                # Collapse multiple spaces again
-                text = re.sub(r"\s+", " ", text)
-                entry[key] = text.strip()
-    return data
-
-
-def flatten(json_text):
-    lines = []
-    for entry in json_text["entries"]:
-        for val in entry.values():
-            if isinstance(val, int):
-                val = str(val)
-            lines.append(val)
-    return " ".join(lines)
-
-
 def compute_metrics(
-    ref_text, hyp_text, doc_format, normalized=False, index_numbers=True
+    ref_text, hyp_text, doc_format="txt", normalized=False, index_numbers=True
 ):
     """
     Compute Levenshtein distance, CER, WER.
@@ -222,32 +123,34 @@ def compute_metrics(
     else => use clean_text_nonorm.
     If index_numbers=True => keep index numbers
     else => remove index numbers
+
+    doc_format is deprecated; only "txt" should be allowed.
     """
     if normalized:
         ref_clean = (
             clean_text_normalized(ref_text, index_numbers)
-            if doc_format == "txt"
-            else clean_json_normalized(ref_text, index_numbers)
+            # if doc_format == "txt"
+            # else clean_json_normalized(ref_text, index_numbers)
         )
         hyp_clean = (
             clean_text_normalized(hyp_text, index_numbers)
-            if doc_format == "txt"
-            else clean_json_normalized(hyp_text, index_numbers)
+            # if doc_format == "txt"
+            # else clean_json_normalized(hyp_text, index_numbers)
         )
     else:
         ref_clean = (
             clean_text_nonorm(ref_text, index_numbers)
-            if doc_format == "txt"
-            else clean_json_nonorm(ref_text, index_numbers)
+            # if doc_format == "txt"
+            # else clean_json_nonorm(ref_text, index_numbers)
         )
         hyp_clean = (
             clean_text_nonorm(hyp_text, index_numbers)
-            if doc_format == "txt"
-            else clean_json_nonorm(hyp_text, index_numbers)
+            # if doc_format == "txt"
+            # else clean_json_nonorm(hyp_text, index_numbers)
         )
-    if doc_format == "json":
-        ref_clean = flatten(ref_clean)
-        hyp_clean = flatten(hyp_clean)
+    # if doc_format == "json":
+    #     ref_clean = flatten(ref_clean)
+    #     hyp_clean = flatten(hyp_clean)
     dist_char = distance.Levenshtein.distance(ref_clean, hyp_clean)
     ref_len = len(ref_clean)
 
