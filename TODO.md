@@ -15,40 +15,41 @@
 - [X] Make sure either NONE of our results are on the github version, or that our final results are on there
 
 # Config
-- [ ] Sort requirements.txt in alphabetical order? Is that something people do? We also should double-check that every requirement is there, and that we don't have requirements listed that we didn't end up using
+- [X] Sort requirements.txt in alphabetical order 
+- [ ] Double-check that every requirement is there, and that we don't have requirements listed that we didn't end up using
 - [ ] Make sure environment.yaml is up to date as well
 
 # Benchmarking
 - For all:
     - [ ] Make sure comments/attributions are up to date
-    - [ ] Make sure import statements at the top have unused imports removed
-    - [ ] Remove old commented-out code
+    - [X] Make sure import statements at the top have unused imports removed
+    - [X] Remove old commented-out code
 - [X] Consistent naming scheme between 'json_accuracy_example.ipynb' and 'txt_accuracy.ipynb'
 
 # Tools
-- [ ] If 'file_retrieval.py' is still in use, update comments
+- [X] If 'file_retrieval.py' is still in use, update comments
 
 # Workflow
 - json_creation.py
     - [X] Update comments and attributions
     - [X] Remove unused imports
-    - [ ] Remove or fix nonworking code
+    - [X] Remove or fix nonworking code
     - [X] Remove commented out code
     - [ ] If time, figure out Gemini async
 - txt_creation.py
     - [ ] Update comments and attributions
-    - [ ] Remove unused imports
-- txt_pipeline.ipynb
-    - [ ] Update comments and attributions
-        - [ ] Write more detailed instructions for running on Windows with anaconda
-        - [ ] Make sure each cell is properly labled and described
-    - [ ] Remove or fix nonworking cells
-    - [ ] Remove unused imports
+    - [X] Remove unused imports
+- pipeline.ipynb
+    - [X] Update comments and attributions
+        - [X] Write more detailed instructions for running on Windows with anaconda
+        - [X] Make sure each cell is properly labled and described
+    - [X] Remove or fix nonworking cells
+    - [X] Remove unused imports
 
 # README.md
-- [ ] Make sure everything is up to date, with instructions for how to get started
-- [ ] Make sure the correct attributions are made
-- [ ] Remove artifacts from Greif et al code that don't apply to us
+- [X] Make sure everything is up to date, with instructions for how to get started
+- [X] Make sure the correct attributions are made
+- [X] Remove artifacts from Greif et al code that don't apply to us
 
 
 
