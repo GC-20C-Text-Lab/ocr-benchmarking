@@ -4,73 +4,27 @@ Testing methods for digitizing print bibliography as structured data
 
 # 🚀 Installation
 
-## Prerequisites
+See `src/workflow/pipeline.ipynb` for prerequisites.
 
-- Anaconda or Miniconda
+# 🔧 Usage
 
-## Install packages:
+Before usage, ensure that the `data` directory is populated with the correct files.
 
-Use Anaconda and install all necessary packages before running commands.
+Then, run each cell in `src/workflow/pipeline.ipynb` following its instructions to generate and benchmark LLM outputs.
 
-```bash
-# Create Conda environment
-conda env create --file=config/environment.yaml
+To obtain visualizations, move benchmark results from `benchmarking-results` to `benchmarking-results-for-visualizations` and then run `src/workflow/visualizations.ipynb`.
 
-# On each new terminal window, activate Conda environment
-conda activate ocr-benchmarking
+# Directory overview
 
-# To install additional packages, add them to config/environment.yaml
-# Then, enter:
-conda env update --file config/environment.yaml
-```
+- `benchmarking-results`: Benchmarking results CSV files generated from the pipeline.
+- `benchmarking-results-for-visualizations`: Visualizations from our benchmark results.
+- `config`: Setup files.
+- `data`: Ground truth text and JSON files, as well as images.
+- `project-notes`: Descriptions of workflow, scratchwork, etc.
+- `results`: LLM and OCR output. Created automatically by the pipeline.
+- `src`: Source code
 
-## Set up API keys
-
-Set up your API keys in `config/.env`:
-
-```
-OPENAI_API_KEY=your_key_here
-GOOGLE_API_KEY=your_key_here
-TRANSKRIBUS_USERNAME=your_username
-TRANSKRIBUS_PASSWORD=your_password
-```
-
-# 📁 Directory Structure
-
-The directory structure is adapted from [Greif et al.](#-credits)
-
-```
-.
-├── benchmarking-results/ # Benchmarking results
-│   └── txt-accuracy/     # Image-to-text accuracy
-├── config/                # Configuration files
-│   ├── environment.yml   # Conda environment specification
-│   └── .env              # API keys and credentials
-├── data/
-│   ├── tiffs/            # Input PDFs (type-1.pdf to type-10.pdf)
-│   ├── ground-truth/     # Ground truth files
-│   │   └── txt/          
-│   └── pngs/             # Intermediate image files as single PNGs
-├── results/              # Output directory for all models
-│   ├── llm-img2csv/      # CSV files from images using multimodal LLMs
-│   │   └── <MODEL_NAME>/ # One folder per model
-│   ├── llm-txt2csv/      # CSV files from transcribed text using multimodal LLMs
-│   │   └── <MODEL_NAME>/
-│   ├── llm-img2txt/      # Text transcribed from images using multimodal LLMs
-│   │   └── <MODEL_NAME>/
-│   ├── ocr-img2txt/      # Text transcribed from images using OCR software
-│   │   └── <MODEL_NAME>/
-├── src/                  # Source code
-│   ├── benchmarking/     # Benchmarking tools
-│   ├── llm-img2csv/      # Image to CSV converters using multimodal LLMs
-│   ├── llm-txt2csv/      # Text to CSV converters
-│   ├── llm-img2txt/      # Image to text converters using multimodal LLMs
-│   ├── ocr-img2txt/      # OCR processors
-│   └── scripts/          # Utility scripts
-└── logs/                 # Log files
-```
-
-## File naming scheme
+# File naming scheme
 
 - `XYZ` refers to a three-digit page number (with padded zeroes as necessary).
 - `{A,B}` refers to either A or B.
@@ -94,21 +48,9 @@ results/{llm,ocr}{img,txt}2{txt,json}/
                             ^ input format      ^ output format
 ```
 
-# 🔧 Usage
+# Other information
 
-Before usage, ensure that the `data` and `results` directories are populated with the correct files.
-
-```bash
-# Perform text accuracy analysis using ground truth and transcribed text files
-python src/benchmarking/txt_accuracy.py
-```
-
-## Input Data Format
-
-- The pipeline expects files to be located and named in accordance with the above [directory structure](#-directory-structure).
-- See formatting guidelines for ground truth text files in the [Ground Truth Guidelines](./ground-truth-guidelines.md)
-
-# 📊 Benchmarking
+Other information about our project can be found in the `project-notes` directory.
 
 # 📋 Credits
 
