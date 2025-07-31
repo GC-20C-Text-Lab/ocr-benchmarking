@@ -33,14 +33,14 @@ Tables are saved under ../../benchmarking-results/json-accuracy/
     - llm-txt2json_nonorm_%Y-%m-%d_%H:%M:%S.csv
     - llm-txt2json_normalized_%Y-%m-%d_%H:%M:%S.csv
 
-Matching rules:
+String matching rules:
  - EXACT: cell1 == cell2 (after basic lowercasing/whitespace trimming)
  - NORMALIZED: ASCII-only, punctuation removed, then lower-cased, compare exact
  - FUZZY: Jaro-Winkler similarity >= 0.90 => matched
+Numeric values must exactly match.
 
-If row counts differ, we proceed with one of the two following options:
- 1. label dimension mismatch (and skip that doc in the aggregated tables).
- 2. WIP: search next rows based on row count difference, take higher similarity
+If the ground truth has one more row than the LLM output, add an empty row to the LLM output and
+proceed with matching. Otherwise, skip the document and mark `mismatch_bool` as True.
 
 Original authors: Niclas Griesshaber, Gavin Greif, Robin Greif
 New authors: Tim Yu, Muhammad Khalid
@@ -252,7 +252,7 @@ def compare_dataframes_core(gt_df: pd.DataFrame, pred_df: pd.DataFrame, method: 
     - gt_df_adj: A copy of the ground truth dataframe after dimensional adjustments
     - pred_df_adj: A copy of the predicted dataframe after dimensional adjustments
     - match_df: A boolean dataframe where a cell is true if and only if the corresponding cell in gt_df_adj and pred_df_adj match.
-    - results: A dictionary with selected results
+    - results: A dictionary with selected results. See the top of document for details.
     """
     # Check if any dataframe is empty
     if gt_df is None or pred_df is None:
@@ -472,7 +472,7 @@ def compare_dataframes_fuzzy(gt_df, pred_df, threshold=FUZZY_THRESHOLD):
 
 def build_dataframe(title, doc_names, results_data):
     """
-    Build a Pandas dataframe for a given results_data and doc_lengths structure.
+    Build a Pandas dataframe for a given results_data and doc_names structure.
     - results_data[model][doc] => (matches, total, mismatch_bool, pred_nrows)
 
     See the top of the file for information about metrics.
