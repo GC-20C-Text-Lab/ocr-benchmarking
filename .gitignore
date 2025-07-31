@@ -12,3 +12,4 @@ json/old
 old-results
 benchmarking-results
 src/workflow/old_pipeline.ipynb
+.venv

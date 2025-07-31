@@ -2,17 +2,21 @@ name: ocr-benchmarking
 channels:
   - defaults
 dependencies:
-  - python
-  - pandas
-  - rapidfuzz
-  - pytesseract
+  - aiofiles
   - anthropic
   - google-genai
-  - openai
-  - pillow
   - instructor
-  - pydantic
-  - typing
-  - json-ref
   - jiwer
-  - aiofiles
+  - json-ref
+  - openai
+  - pandas
+  - pillow
+  - python
+  - pydantic
+  - pytesseract 
+  - rapidfuzz
+  - requests
+  - typing
+  
+
+

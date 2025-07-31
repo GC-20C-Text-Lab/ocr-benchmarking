@@ -265,10 +265,10 @@ def gemini_img2json(path):
     # Return JSON, with 2 spaces of indentation and default values excluded
     return entries.model_dump_json(indent=2, exclude_defaults=True)
 
-
 # Takes as input the path to an image and writes formatted JSON following the Entries schema to the path specified by output_path
 async def gemini_img2json_async(input_img_path, output_path):
-    # Create the Google GenAI client
+     # Create the Google GenAI client
+
     async_client = instructor.from_provider(
         "google/gemini-2.5-flash", async_client=True
     )
@@ -290,6 +290,7 @@ async def gemini_img2json_async(input_img_path, output_path):
     # Async file write
     async with aiofiles.open(output_path, "w") as f:
         await f.write(json_result)
+
 
 
 # Retries API calls for mLLMs if it hits a rate limit error. Uses exponential backoff with a random time
