@@ -6,10 +6,10 @@
 # Project architecture
 - [ ] Move files such as 'workflow.md', 'process-outline.md', 'mllm-questions', 'ground-truth-guidelines.md', etc into a folder named something like 'notes', or move them to another location such as OneDrive. Possibly combine some of these files into one. 
     - [ ] Similarly, examine the tesseract folder and see which of those files should be moved, renamed, or removed
-- [ ] Delete old pipeline file, rename new pipeline file to just 'pipeline'
-- [ ] 'file_retrieval' is the only file in the 'tools' folder, are there other things we should move there? 
-- [ ] Should 'requirements.txt' be in the config folder? What about '.gitignore'?
-- [ ] 'prompts' folder should either be deleted, or our new prompts should be put in there
+- [X] Delete old pipeline file, rename new pipeline file to just 'pipeline'
+- [X] 'file_retrieval' is the only file in the 'tools' folder, are there other things we should move there? 
+- [X] Should 'requirements.txt' be in the config folder? What about '.gitignore'?
+- [X] 'prompts' folder should either be deleted, or our new prompts should be put in there
 
 # benchmarking-results
 - [ ] Make sure either NONE of our results are on the github version, or that our final results are on there
@@ -30,10 +30,10 @@
 
 # Workflow
 - json_creation.py
-    - [ ] Update comments and attributions
-    - [ ] Remove unused imports
+    - [X] Update comments and attributions
+    - [X] Remove unused imports
     - [ ] Remove or fix nonworking code
-    - [ ] Remove commented out code
+    - [X] Remove commented out code
     - [ ] If time, figure out Gemini async
 - txt_creation.py
     - [ ] Update comments and attributions
