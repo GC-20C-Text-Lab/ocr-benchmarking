@@ -1,0 +1,13 @@
+pytesseract==0.3.13
+python-dotenv==1.1.0
+RapidFuzz==3.13.0
+requests==2.32.4
+anthropic==0.55.0
+google-genai==1.21.1
+openai==1.88.0
+pandas==2.3.0
+pillow==11.2.1
+instructor==1.9.0
+pydantic==2.11.7
+json-ref==1.1.0
+aiofiles==24.1.0
