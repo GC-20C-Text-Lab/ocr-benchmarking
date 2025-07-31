@@ -1,7 +1,7 @@
 """
 Benchmarking OCR vs. LLM for text extraction. Uses RapidFuzz (for CER, TSR) and JiWER (for WER).
 
-Each type of results has 4 rows for each document and for all documents:
+Each type of results has 4 rows for each document and for all (__ALL__) documents:
    1) Levenshtein distance ({doc}:dist_char)
    2) ground-truth doc length (for that table's version) ({doc}:doc_len)
    3) CER% (distance / length_of_that_version) ({doc}:cer_pct)
@@ -85,9 +85,7 @@ def clean_text_nonorm(text, index_numbers=True):
 def clean_text_normalized(text, index_numbers=True):
     """
     Fully normalized:
-      - Remove linebreaks/tabs
-      - Remove all instances of \"- \" (dash space; word separated by line break)
-      - Remove extra spaces of number intervals separated by line break
+      - All minimal cleaning steps (see `clean_text_nonorm`), and then:
       - Remove all non-ASCII (accented letters are dropped)
       - Convert to lowercase
       - Remove punctuation => keep only [a-z0-9] plus spaces
@@ -125,6 +123,8 @@ def compute_metrics(
     else => remove index numbers
 
     doc_format is deprecated; only "txt" should be allowed.
+
+    Returns a dictionary with metrics for a single page.
     """
     if normalized:
         ref_clean = (
@@ -185,6 +185,7 @@ def build_dataframe(title, doc_names, results_data, doc_lengths, total_doc_len):
 
     The dataframe has one row for each document and metric, for example:
     - doc1:dist_char, doc1:doc_len, doc1:cer_pct, doc1:wer_pct, doc2:dist_char, ..., __ALL__:dist_char, ...
+    See top of this file for more details about metrics
 
     The dataframe has one column for each model used, like pytesseract.
 
