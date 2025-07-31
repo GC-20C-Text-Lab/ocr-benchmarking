@@ -1,3 +1,7 @@
+"""
+Authors: Amelia Vrieze and Muhammad Khalid
+"""
+
 import random
 from pydantic import BaseModel, Field
 import instructor
@@ -159,10 +163,12 @@ def openai_img2json(path):
     # Return JSON, with 2 spaces of indentation and default values excluded
     return entries.model_dump_json(indent=2, exclude_defaults=True)
 
-
+# Takes as input the path to an image and writes formatted JSON following the Entries schema to the path specified by output_path
+# OpenAI async version
 async def openai_img2json_async(input_path, output_path):
+    # Create OpenAI client
     client = from_openai(AsyncOpenAI())
-
+    # Call the API
     entries = await client.chat.completions.create(
         model="gpt-4o",
         response_model=Entries,
@@ -211,8 +217,6 @@ def gemini_txt2json(path):
     )
     # Return JSON, with 2 spaces of indentation and default values excluded
     return entries.model_dump_json(indent=2, exclude_defaults=True)
-    # with open(path, "w") as file:
-    # file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
 
 async def gemini_txt2json_async(input_path, output_path):
@@ -259,14 +263,14 @@ def gemini_img2json(path):
     )
     # Return JSON, with 2 spaces of indentation and default values excluded
     return entries.model_dump_json(indent=2, exclude_defaults=True)
-    # with open(path, "w") as file:
-    # file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
-
+# Takes as input the path to an image and writes formatted JSON following the Entries schema to the path specified by output_path
 async def gemini_img2json_async(input_img_path, output_path):
+     # Create the Google GenAI client
     async_client = instructor.from_provider(
         "google/gemini-2.5-flash", async_client=True
     )
+    # Call the API
     response = await async_client.chat.completions.create(
         response_model=Entries,
         messages=[
@@ -315,8 +319,6 @@ def anthropic_txt2json(path):
     )
     # Return JSON, with 2 spaces of indentation and default values excluded
     return entries.model_dump_json(indent=2, exclude_defaults=True)
-    # with open(os.path.join(project_root, "json", "anthropictxt2json_kbaa-p003.json"), "w") as file:
-    # file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
 
 # Takes as input the path to an image file and returns formatted JSON following the Entries schema
