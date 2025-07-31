@@ -11,3 +11,4 @@ ignore/*
 json/old
 old-results
 benchmarking-results
+.venv

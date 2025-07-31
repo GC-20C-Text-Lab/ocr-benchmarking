@@ -1,0 +1,5 @@
+"""
+Your task is to transcribe this image of a historical bibliography page as faithfully as possible.
+Only transcribe typed text that appears on the page and do not attempt to predict missing information or complete cut off entries. 
+Put each entry on a separate line. When an entry has an index number in square brackets, place it at the end of the entry. 
+"""
