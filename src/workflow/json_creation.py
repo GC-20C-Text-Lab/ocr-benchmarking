@@ -1,22 +1,14 @@
 import random
-import PIL
 from pydantic import BaseModel, Field
 import instructor
 from typing import List
 from openai import OpenAI, AsyncOpenAI
 from instructor import from_openai, from_genai, Mode
 import anthropic
-
-# from google import genai
 from google.genai import Client
 import aiofiles
 import asyncio
 
-# import os
-# need to install json-ref even though it's not listed in imports
-
-# script_dir = os.path.dirname(os.path.realpath(__file__))
-# project_root = os.path.abspath(os.path.join(script_dir, ".."))
 
 
 # JSON schema for mLLMs to strictly follow
@@ -108,15 +100,18 @@ def openai_txt2json(path):
     )
     # Return JSON, with 2 spaces of indentation and default values excluded
     return entries.model_dump_json(indent=2, exclude_defaults=True)
-    # with open(path, "w") as file:
-    # file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
-
+# Takes as input the path to a text file and writes formatted JSON following the Entries schema to the path specified by output_path
+# OpenAI async version
 async def openai_txt2json_async(input_path, output_path):
+    # Create OpenAI client
     client = from_openai(AsyncOpenAI())
+
+    # Convert contents of the file to a string
     async with aiofiles.open(input_path, "r") as f:
         text = await f.read()
 
+    # Call the API
     entries = await client.chat.completions.create(
         model="gpt-4o",
         response_model=Entries,
@@ -163,8 +158,6 @@ def openai_img2json(path):
     )
     # Return JSON, with 2 spaces of indentation and default values excluded
     return entries.model_dump_json(indent=2, exclude_defaults=True)
-    # with open(path, "w") as file:
-    # file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
 
 async def openai_img2json_async(input_path, output_path):
