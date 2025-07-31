@@ -54,7 +54,7 @@ def get_all_models(type, *argv):
         - gpt-4o
             - doc1.txt
             - doc2.txt
-        - gemini-2.0
+        - gemini-2.5
             - doc1.txt
             - doc2.txt
     - ocr_root
@@ -123,23 +123,3 @@ def get_paths(dir, doc_format, name_has_prefix=False):
         if path.suffix.lower() == f".{doc_format}" and path.is_file():
             filepaths.append(path)
     return filepaths
-
-
-"""
-all_docs = {
-    "entries": [
-        {
-            "city": "Tokyo..."
-            "city": "Tokyo..."
-        },
-        {
-            "food": "sushi",
-            "food": "sushi",
-        }
-        {
-            All the other entries throughout the entire book
-        },
-        ...
-    ]
-}
-"""
