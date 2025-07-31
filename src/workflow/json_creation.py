@@ -3,39 +3,30 @@ Authors: Amelia Vrieze and Muhammad Khalid
 """
 
 import random
-import PIL
 from pydantic import BaseModel, Field
 import instructor
 from typing import List
 from openai import OpenAI, AsyncOpenAI
-from instructor import from_openai, from_genai, Mode
+from instructor import from_openai
 import anthropic
-
-# from google import genai
 from google.genai import Client
 import aiofiles
 import asyncio
-
-# import os
-# need to install json-ref even though it's not listed in imports
-
-# script_dir = os.path.dirname(os.path.realpath(__file__))
-# project_root = os.path.abspath(os.path.join(script_dir, ".."))
 
 
 # JSON schema for mLLMs to strictly follow
 class Entry(BaseModel):
     lastname: str = Field(
         default="",
-        description="The author\'s last name. In the original entries, names are written in Last Name, First Name format. If the name is followed by \"(pseud.)\", this indicates that the name is a pseudonym, but it should still be stored in this field. If this information is not found, assign the empty string to this field.",
+        description='The author\'s last name. In the original entries, names are written in Last Name, First Name format. If the name is followed by "(pseud.)", this indicates that the name is a pseudonym, but it should still be stored in this field. If this information is not found, assign the empty string to this field.',
     )
     firstname: str = Field(
         default="",
-        description="The author\'s first name(s). In the original entries, names are written in Last Name, First Name format. If this information is not found, assign the empty string to this field.",
+        description="The author's first name(s). In the original entries, names are written in Last Name, First Name format. If this information is not found, assign the empty string to this field.",
     )
     maidenname: str = Field(
         default="",
-        description="The author\'s maiden name. If they have one, it will be found in parentheses after the rest of the name. If this information is not found, assign the empty string to this field.",
+        description="The author's maiden name. If they have one, it will be found in parentheses after the rest of the name. If this information is not found, assign the empty string to this field.",
     )
     birthyear: int = Field(
         default=0,
@@ -51,15 +42,15 @@ class Entry(BaseModel):
     )
     city: str = Field(
         default="",
-        description="The city the book was published in. In the original entries, it is often followed by a colon. It may occasionally take the format CITY, STATE. It is acceptable to include the state in this field. In entries that include the words \"No imprint\", this information is often unavailable. If this information is not found, assign the empty string to this field.",
+        description='The city the book was published in. In the original entries, it is often followed by a colon. It may occasionally take the format CITY, STATE. It is acceptable to include the state in this field. In entries that include the words "No imprint", this information is often unavailable. If this information is not found, assign the empty string to this field.',
     )
     publisher: str = Field(
         default="",
-        description="The name of the publisher which published the book. In the original entries, it often follows a colon. In entries that include the words \"No imprint\", this information is often unavailable. If this information is not found, assign the empty string to this field.",
+        description='The name of the publisher which published the book. In the original entries, it often follows a colon. In entries that include the words "No imprint", this information is often unavailable. If this information is not found, assign the empty string to this field.',
     )
     publishyear: int = Field(
         default=0,
-        description="The year the book was published. Usually separated from the name of the publisher by a comma, although occasionally a period was used instead. In entries that include the words \"No imprint\", this information is often unavailable. If this information is not found, assign 0 to this field.",
+        description='The year the book was published. Usually separated from the name of the publisher by a comma, although occasionally a period was used instead. In entries that include the words "No imprint", this information is often unavailable. If this information is not found, assign 0 to this field.',
     )
     pagecount: int = Field(
         default=0,
@@ -71,7 +62,7 @@ class Entry(BaseModel):
     )
     description: str = Field(
         default="",
-        description="A description of the book, or the author\'s occupation. After the library field, the description consists of whatever is left of the entry (unless the index number is treated as occurring at the end of the entry). In entries where the author uses a pseudonym, the information after \"(pseud.)\" should be included in this field. If this information is not found, assign the empty string to this field.",
+        description='A description of the book, or the author\'s occupation. After the library field, the description consists of whatever is left of the entry (unless the index number is treated as occurring at the end of the entry). In entries where the author uses a pseudonym, the information after "(pseud.)" should be included in this field. If this information is not found, assign the empty string to this field.',
     )
     index: int = Field(
         default=0,
@@ -112,15 +103,19 @@ def openai_txt2json(path):
     )
     # Return JSON, with 2 spaces of indentation and default values excluded
     return entries.model_dump_json(indent=2, exclude_defaults=True)
-    # with open(path, "w") as file:
-    # file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
 
 
+# Takes as input the path to a text file and writes formatted JSON following the Entries schema to the path specified by output_path
+# OpenAI async version
 async def openai_txt2json_async(input_path, output_path):
+    # Create OpenAI client
     client = from_openai(AsyncOpenAI())
+
+    # Convert contents of the file to a string
     async with aiofiles.open(input_path, "r") as f:
         text = await f.read()
 
+    # Call the API
     entries = await client.chat.completions.create(
         model="gpt-4o",
         response_model=Entries,
@@ -167,8 +162,7 @@ def openai_img2json(path):
     )
     # Return JSON, with 2 spaces of indentation and default values excluded
     return entries.model_dump_json(indent=2, exclude_defaults=True)
-    # with open(path, "w") as file:
-    # file.write(entries.model_dump_json(indent=2, exclude_defaults=True))
+
 
 # Takes as input the path to an image and writes formatted JSON following the Entries schema to the path specified by output_path
 # OpenAI async version
@@ -274,6 +268,7 @@ def gemini_img2json(path):
 # Takes as input the path to an image and writes formatted JSON following the Entries schema to the path specified by output_path
 async def gemini_img2json_async(input_img_path, output_path):
      # Create the Google GenAI client
+
     async_client = instructor.from_provider(
         "google/gemini-2.5-flash", async_client=True
     )
@@ -297,65 +292,8 @@ async def gemini_img2json_async(input_img_path, output_path):
         await f.write(json_result)
 
 
-# Takes as input the path to a text file and returns formatted JSON following the Entries schema
-# Anthropic version
-def anthropic_txt2json(path):
-    # Convert contents of the file to a string
-    text = ""
-    with open(path, "r") as file:
-        text = file.read()
-    # Create the Anthropic client
-    client = instructor.from_anthropic(anthropic.Anthropic())
-    # Call the API
-    entries = client.chat.completions.create(
-        model="claude-sonnet-4-20250514",
-        response_model=Entries,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "Convert each entry in this bibliography into structured JSON:\n"
-                        + text,
-                    }
-                ],
-            }
-        ],
-        max_tokens=10000,
-    )
-    # Return JSON, with 2 spaces of indentation and default values excluded
-    return entries.model_dump_json(indent=2, exclude_defaults=True)
 
-
-# Takes as input the path to an image file and returns formatted JSON following the Entries schema
-# Anthropic version
-# Max image size: 5MB
-def anthropic_img2json(path):
-    # Create the Anthropic client
-    client = instructor.from_anthropic(anthropic.Anthropic())
-    # Call the API
-    entries = client.chat.completions.create(
-        model="claude-sonnet-4-20250514",
-        response_model=Entries,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    instructor.Image.from_path(path),
-                    {
-                        "type": "text",
-                        "text": "Using this scanned image of the page, convert each entry in this bibliography into structured JSON.\n",
-                    },
-                ],
-            }
-        ],
-        max_tokens=10000,
-    )
-    # Return JSON, with 2 spaces of indentation and default values excluded
-    return entries.model_dump_json(indent=2, exclude_defaults=True)
-
-
+# Retries API calls for mLLMs if it hits a rate limit error. Uses exponential backoff with a random time
 async def retry_with_backoff(fn, *args):
     retries, base_delay = 5, 2
     for attempt in range(retries):
@@ -377,6 +315,7 @@ async def limited_processor(semaphore, processor, *args):
         return await retry_with_backoff(processor, *args)
 
 
+# Processes Image or text asynchronously
 async def process_json_async(input_paths, output_dir, processor, model):
     # Array to hold all the tasks to be completed including writing to files
     tasks = []
