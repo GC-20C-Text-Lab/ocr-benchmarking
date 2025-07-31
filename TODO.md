@@ -4,8 +4,8 @@
 - [ ] Find a way to remove Jupyter metadata from git so that branch merges and pulling isn't so painful
 
 # Project architecture
-- [ ] Move files such as 'workflow.md', 'process-outline.md', 'mllm-questions', 'ground-truth-guidelines.md', etc into a folder named something like 'notes', or move them to another location such as OneDrive. Possibly combine some of these files into one. 
-    - [ ] Similarly, examine the tesseract folder and see which of those files should be moved, renamed, or removed
+- [X] Move files such as 'workflow.md', 'process-outline.md', 'mllm-questions', 'ground-truth-guidelines.md', etc into a folder named something like 'notes', or move them to another location such as OneDrive. Possibly combine some of these files into one. 
+    - [X] Similarly, examine the tesseract folder and see which of those files should be moved, renamed, or removed
 - [X] Delete old pipeline file, rename new pipeline file to just 'pipeline'
 - [X] 'file_retrieval' is the only file in the 'tools' folder, are there other things we should move there? 
 - [X] Should 'requirements.txt' be in the config folder? What about '.gitignore'?
