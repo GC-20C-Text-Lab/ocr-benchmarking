@@ -1,14 +1,23 @@
+"""
+This code provides asynchronous functions for OCR and text transcription using mLLMs.
+It supports image-to-text and OCR post-processing workflows using OpenAI, Google's Gemini, and OpenRouter APIs (not implemented yet).
+This code also implements retry mechanisms and concurrency control for processing multiple files quickly.
+
+Main features:
+- Direct image-to-text transcription
+- OCR post-processing with image context
+- Support for multiple LLM providers (OpenAI, Gemini, OpenRouter)
+- Asynchronous processing with concurrency control
+- Automatic retries with exponential backoff
+"""
+
 import base64
 import os
 from pathlib import Path
 import random
 import PIL
-from pydantic import BaseModel, Field
-import instructor
 from typing import List
-from openai import OpenAI, AsyncOpenAI
-from instructor import from_openai, from_genai, Mode
-import anthropic
+from openai import AsyncOpenAI
 
 # from google import genai
 from google.genai import Client
@@ -37,6 +46,15 @@ opensource_llms = {"qwen2.5-vl-72b-instruct": "qwen", "llama-4-maverick": "meta-
 
 
 async def encode_image_to_base64(image_path):
+    """
+    Encode an image file to base64 string asynchronously.
+
+    Args:
+        image_path: Path to the image file to encode
+
+    Returns:
+        dict: Image content dictionary in the format required by LLM APIs
+    """
     async with aiofiles.open(image_path, "rb") as f:
         img_bytes = await f.read()
     base64_img = base64.b64encode(img_bytes).decode("utf-8")
@@ -48,6 +66,13 @@ async def encode_image_to_base64(image_path):
 
 
 async def openai_img2txt_async(input_img_path, output_path):
+    """
+    Process an image using OpenAI's GPT-4 Vision API and save the transcribed text.
+
+    Args:
+        input_img_path: Path to the input image file
+        output_path: Path where the transcribed text will be saved
+    """
     client = AsyncOpenAI()
     # Read and base64-encode image
     async with aiofiles.open(input_img_path, "rb") as f:
@@ -82,18 +107,33 @@ async def openai_img2txt_async(input_img_path, output_path):
 
 
 async def gemini_img2txt_async(input_img_path, output_path):
+    """
+    Process an image using Google's Gemini Vision API and save the transcribed text.
+
+    Args:
+        input_img_path: Path to the input image file
+        output_path: Path where the transcribed text will be saved
+    """
     client = Client()
     img = PIL.Image.open(input_img_path)
     response = await client.aio.models.generate_content(
-        model="gemini-2.5-flash", 
-        config= types.GenerateContentConfig(temperature = 0), 
-        contents=[prompt_llm, img]
+        model="gemini-2.5-flash",
+        config=types.GenerateContentConfig(temperature=0),
+        contents=[prompt_llm, img],
     )
     async with aiofiles.open(output_path, "w") as f:
         await f.write(response.text)
 
 
 async def gemini_img_txt2txt_async(input_img_path, input_txt_path, output_path):
+    """
+    Process an image and OCR text using Gemini Vision API for post-processing.
+
+    Args:
+        input_img_path: Path to the input image file
+        input_txt_path: Path to the input OCR text file
+        output_path: Path where the processed text will be saved
+    """
     client = Client()
     input = ""
     async with aiofiles.open(input_txt_path, "r") as f:
@@ -101,15 +141,23 @@ async def gemini_img_txt2txt_async(input_img_path, input_txt_path, output_path):
     prompt_ocr_llm = prompt_template_ocr_llm.format(input=input).strip()
     img = PIL.Image.open(input_img_path)
     response = await client.aio.models.generate_content(
-        model="gemini-2.5-flash", 
-        config= types.GenerateContentConfig(temperature = 0),
-        contents=[prompt_ocr_llm, img]
+        model="gemini-2.5-flash",
+        config=types.GenerateContentConfig(temperature=0),
+        contents=[prompt_ocr_llm, img],
     )
     async with aiofiles.open(output_path, "w") as f:
         await f.write(response.text)
 
 
 async def openai_img_txt2txt_async(input_img_path, input_txt_path, output_path):
+    """
+    Process an image and OCR text using OpenAI's GPT-4 Vision API for post-processing.
+
+    Args:
+        input_img_path: Path to the input image file
+        input_txt_path: Path to the input OCR text file
+        output_path: Path where the processed text will be saved
+    """
     client = AsyncOpenAI()
     input = ""
     async with aiofiles.open(input_txt_path, "r") as f:
@@ -148,6 +196,13 @@ async def openai_img_txt2txt_async(input_img_path, input_txt_path, output_path):
 
 
 async def openrouter_img2txt_async(input_img_path, output_path):
+    """
+    Process an image using OpenRouter API with various open-source LLMs.
+
+    Args:
+        input_img_path: Path to the input image file
+        output_path: Path where the transcribed text will be saved
+    """
     client = AsyncOpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.getenv("OPENROUTER_API_KEY"),
@@ -189,6 +244,14 @@ async def openrouter_img2txt_async(input_img_path, output_path):
 
 
 async def openrouter_img_txt2txt_async(input_img_path, input_txt_path, output_path):
+    """
+    Process an image and OCR text using OpenRouter API with open-source LLMs.
+
+    Args:
+        input_img_path: Path to the input image file
+        input_txt_path: Path to the input OCR text file
+        output_path: Path where the processed text will be saved
+    """
     client = AsyncOpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.getenv("OPENROUTER_API_KEY"),
@@ -233,6 +296,19 @@ async def openrouter_img_txt2txt_async(input_img_path, input_txt_path, output_pa
 
 
 async def retry_with_backoff(fn, *args):
+    """
+    Execute an async function with exponential backoff retry logic.
+
+    Args:
+        fn: Async function to execute
+        *args: Arguments to pass to the function
+
+    Returns:
+        The result of the successful function execution
+
+    Raises:
+        Exception: If all retry attempts fail
+    """
     retries, base_delay = 5, 2
 
     for attempt in range(retries):
@@ -249,11 +325,28 @@ async def retry_with_backoff(fn, *args):
 
 
 async def limited_processor(semaphore, processor, *args):
+    """
+    Execute a processor function with concurrency control using a semaphore.
+
+    Args:
+        semaphore: Asyncio Semaphore for concurrency control
+        processor: Async function to execute
+        *args: Arguments to pass to the processor
+    """
     async with semaphore:
         return await retry_with_backoff(processor, *args)
 
 
 async def process_single_async(input_img_paths, output_dir, processor, model):
+    """
+    Process multiple images asynchronously with concurrency control.
+
+    Args:
+        input_img_paths: List of paths to input image files
+        output_dir: Directory where output files will be saved
+        processor: Async function to process each image
+        model: Name of the model/directory for organizing outputs
+    """
     # Array to hold all the tasks to be completed including writing to files
     tasks = []
     n = len(input_img_paths)
@@ -272,6 +365,19 @@ async def process_single_async(input_img_paths, output_dir, processor, model):
 async def process_double_async(
     input_img_paths, input_txt_paths, output_dir, processor, model
 ):
+    """
+    Process multiple image-text pairs asynchronously with concurrency control.
+
+    Args:
+        input_img_paths: List of paths to input image files
+        input_txt_paths: List of paths to input OCR text files
+        output_dir: Directory where output files will be saved
+        processor: Async function to process each image-text pair
+        model: Name of the model/directory for organizing outputs
+
+    Raises:
+        NameError: If image and text file names don't match
+    """
     input_img_paths = sorted(input_img_paths)
     input_txt_paths = sorted(input_txt_paths)
     n = len(input_img_paths)
@@ -282,8 +388,12 @@ async def process_double_async(
     # Validate inputs
     for i in range(n):
         if input_img_paths[i].stem != input_txt_paths[i].stem:
-            raise NameError(f"Your image '{input_img_paths[i]}' and text '{input_txt_paths[i]}' files don't match")
-        print(f"Matched image file '{input_img_paths[i]}' with text file {input_txt_paths[i]}")
+            raise NameError(
+                f"Your image '{input_img_paths[i]}' and text '{input_txt_paths[i]}' files don't match"
+            )
+        print(
+            f"Matched image file '{input_img_paths[i]}' with text file {input_txt_paths[i]}"
+        )
 
     # Call function asynchronously
     for i in range(n):
@@ -292,7 +402,8 @@ async def process_double_async(
             semaphore, processor, input_img_paths[i], input_txt_paths[i], output_path
         )
         tasks.append(task)
-        print(f"Added task with image file '{input_img_paths[i]}' and text file {input_txt_paths[i]}")
+        print(
+            f"Added task with image file '{input_img_paths[i]}' and text file {input_txt_paths[i]}"
+        )
 
     await asyncio.gather(*tasks)
-
